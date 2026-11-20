@@ -341,7 +341,15 @@ async function checkAnswer(c: Contract, answer: string): Promise<{ correct: bool
     });
     if (res.status === 401) return { correct: false, error: "Sign-in expired. Refresh and try again." };
     if (res.status === 429) return { correct: false, error: "Too many attempts. Take a breath, Agent." };
-    if (!res.ok) return { correct: false, error: "The console is unreachable. Try again later." };
+    if (!res.ok) {
+      // Surface the server's real message so failures are diagnosable.
+      let msg = "The console is unreachable (HTTP " + res.status + ").";
+      try {
+        const body = await res.json();
+        if (body && body.error) msg = body.error + " (HTTP " + res.status + ")";
+      } catch { /* not JSON: keep default */ }
+      return { correct: false, error: msg };
+    }
     return res.json();
   }
   // DEV MODE: local compare against gitignored answers.dev.json
