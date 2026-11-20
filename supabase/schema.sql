@@ -1,5 +1,5 @@
 -- ============================================================
--- SERPENT HQ (a Hacktoria game) — Supabase schema v0.4.1
+-- SERPENT HQ (a Hacktoria game) — Supabase schema v0.5
 -- Run this once in the Supabase SQL editor (see docs/RUNBOOK.md).
 -- ============================================================
 
@@ -109,8 +109,21 @@ create policy "agents read own submissions"
   on public.submissions for select
   using (auth.uid() = profile_id);
 
--- The leaderboard view runs with owner rights, so grant public read explicitly:
+-- ---------- Grants ----------
+-- LESSON (learned the hard way, 2026-11-20): RLS policies filter ROWS,
+-- but roles also need table-level GRANTs, and SQL-editor-created tables
+-- do not inherit all of them automatically. Explicit is better.
+grant select on public.profiles to anon, authenticated;
+grant update (codename, avatar_url) on public.profiles to authenticated;
+grant select on public.contracts to anon, authenticated;
+grant select on public.submissions to authenticated;
 grant select on public.leaderboard to anon, authenticated;
+-- service_role: used by the Edge Function. Needs full privileges, and on
+-- new-generation projects (sb_secret_* keys) these grants do NOT exist
+-- by default for hand-created tables either.
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+-- contract_answers: intentionally NO grants to anon/authenticated.
 
 -- ---------- seed contracts ----------
 insert into public.contracts (slug, emoji, title, discipline, difficulty, points, display_order) values
@@ -123,5 +136,8 @@ insert into public.contracts (slug, emoji, title, discipline, difficulty, points
 on conflict (slug) do nothing;
 
 -- NOTE: seed contract_answers out-of-band (do not commit hashes to the repo).
--- Helper for generating them, run locally per contract:
---   select encode(digest(lower(trim('2021')), 'sha256'), 'hex');
+-- One-shot seeding for the six fixture placeholder contracts:
+--   insert into public.contract_answers (contract_slug, answer_hash) values
+--     ('ghost-domain', encode(digest('2021','sha256'),'hex')), ... etc
+--   on conflict (contract_slug) do update set answer_hash = excluded.answer_hash;
+-- Real answers: hash locally, never in chat or the repo.
