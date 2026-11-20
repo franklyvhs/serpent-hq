@@ -1,0 +1,16 @@
+{
+  "name": "serpent-hq",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SERPENT HQ — a Hacktoria browser OSINT adventure game set in the SERPENT headquarters.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0"
+  }
+}

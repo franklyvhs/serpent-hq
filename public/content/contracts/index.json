@@ -1,0 +1,68 @@
+[
+  {
+    "slug": "ghost-domain",
+    "emoji": "🌐",
+    "title": "The Ghost Domain",
+    "discipline": "Internet",
+    "difficulty": "Easy",
+    "points": 100,
+    "brief": "A SERPENT informant received an email from 'collector@hacktoria.com' but suspects it's not really us. Check the public WHOIS record of hacktoria.com. Reply with the registration year.",
+    "hint": "Any public WHOIS service will show the creation date.",
+    "answer": "2019"
+  },
+  {
+    "slug": "impostor-handler",
+    "emoji": "🥸",
+    "title": "The Impostor Handler",
+    "discipline": "Social",
+    "difficulty": "Easy",
+    "points": 150,
+    "brief": "Someone is impersonating Klumgongyn, our alien liaison. The real Klumgongyn always names his home planet when he signs a message. Which planet is that?",
+    "hint": "Consult the SERPENT lore briefing.",
+    "answer": "varnyr"
+  },
+  {
+    "slug": "rack-radiation",
+    "emoji": "💾",
+    "title": "Rack Radiation",
+    "discipline": "Data",
+    "difficulty": "Medium",
+    "points": 250,
+    "brief": "The server rack in the lab is blinking a warning pattern. The failing unit's serial starts with the same letters as our agency acronym. What are the first three letters of 'Special Espionage Reconnaissance Protection Enforcement Neutralization Taskforce'?",
+    "hint": "Take the first letter of each main word.",
+    "answer": "ser"
+  },
+  {
+    "slug": "ghost-ship",
+    "emoji": "🚢",
+    "title": "Ghost Ship of the Gulf",
+    "discipline": "Maritime",
+    "difficulty": "Hard",
+    "points": 400,
+    "brief": "A cargo vessel went dark in the Baltic after leaving a Finnish port. Using public AIS history sites, determine how many digits a full IMO number has.",
+    "hint": "IMO numbers are a 7-digit identifier.",
+    "answer": "7"
+  },
+  {
+    "slug": "forensic-first-contact",
+    "emoji": "🔎",
+    "title": "Forensic First Contact",
+    "discipline": "Forensics",
+    "difficulty": "Medium",
+    "points": 250,
+    "brief": "A photograph recovered from a suspect's post shows the sun setting over open water. If genuine, the camera was facing roughly which cardinal direction in the evening? (north/south/east/west)",
+    "hint": "The sun sets in the west everywhere on Earth.",
+    "answer": "west"
+  },
+  {
+    "slug": "serpents-cipher",
+    "emoji": "🧩",
+    "title": "The Serpent's Cipher",
+    "discipline": "Logic",
+    "difficulty": "Easy",
+    "points": 100,
+    "brief": "The door keypad at HQ blinks at you. The passcode is the number of letters in the name of SERPENT's alien liaison. How many letters are in 'Klumgongyn'?",
+    "hint": "Count carefully: K-l-u-m-g-o-n-g-y-n.",
+    "answer": "10"
+  }
+]

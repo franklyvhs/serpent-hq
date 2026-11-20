@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SERPENT HQ — a Hacktoria game</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="hud">
+        <span class="logo">HACKTORIA presents <em>SERPENT HQ</em></span>
+        <span id="hud-agent">unassigned</span>
+        <span id="hud-score">0 pts</span>
+      </div>
+      <div id="stage">
+        <canvas id="game" width="640" height="448"></canvas>
+        <div id="prompt" class="hidden">Press E to open the Contract Console</div>
+      </div>
+      <p id="footnote">WASD / arrow keys to move · E to interact</p>
+    </div>
+
+    <div id="console-modal" class="hidden">
+      <div id="console-inner">
+        <header>
+          <h2>CONTRACT CONSOLE <button id="console-close" title="Close">✕</button></h2>
+        </header>
+        <div id="console-body">
+          <ul id="contract-list"></ul>
+          <div id="contract-detail" class="hidden">
+            <h3 id="cd-title"></h3>
+            <div id="cd-meta"></div>
+            <p id="cd-brief"></p>
+            <p id="cd-hint" class="hidden"></p>
+            <input id="cd-answer" placeholder="Your answer…" autocomplete="off" />
+            <button id="cd-submit">SUBMIT</button>
+            <p id="cd-feedback"></p>
+            <button id="cd-back">← back to list</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
