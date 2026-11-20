@@ -1,9 +1,10 @@
 // ============================================================
 // SERPENT HQ — check-answer Edge Function (Deno)
 // Deploy: supabase functions deploy check-answer
-// Required secrets (set via `supabase secrets set` or the dashboard):
-//   SUPABASE_SERVICE_ROLE_KEY  (injected automatically by Supabase)
-//   SUPABASE_ANON_KEY           (from Settings → API)
+// Required secrets (set via the dashboard, names may NOT start
+// with SUPABASE_ — that prefix is reserved):
+//   ANON_KEY  (the publishable/anon key from Settings → API)
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase.
 // Client sends: { slug, answer } with an Authorization: Bearer <jwt>
 // Returns: { correct, points?, firstSolve?, error? }
 // ============================================================
@@ -12,7 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const ANON_KEY = Deno.env.get("ANON_KEY")!;
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
