@@ -1,5 +1,5 @@
 -- ============================================================
--- SERPENT HQ (a Hacktoria game) — Supabase schema v0.2
+-- SERPENT HQ (a Hacktoria game) — Supabase schema v0.3
 -- Run this once in the Supabase SQL editor (see docs/RUNBOOK.md).
 -- ============================================================
 
@@ -72,7 +72,7 @@ create index submissions_profile_idx on public.submissions (profile_id, submitte
 create index submissions_attempt_rate_idx on public.submissions (profile_id, submitted_at);
 
 -- ---------- leaderboard view ----------
-create or replace view public.leaderboard
+create or replace view public.leaderboard as
 with scores as (
   select s.profile_id, sum(c.points) as total_points, count(*) as contracts_solved
   from public.submissions s
