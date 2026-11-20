@@ -7,8 +7,7 @@
     "difficulty": "Easy",
     "points": 100,
     "brief": "A SERPENT informant received an email from 'collector@hacktoria.com' but suspects it's not really us. Check the public WHOIS record of hacktoria.com. Reply with the registration year.",
-    "hint": "Any public WHOIS service will show the creation date.",
-    "answer": "2021"
+    "hint": "Any public WHOIS service will show the creation date."
   },
   {
     "slug": "impostor-handler",
@@ -18,8 +17,7 @@
     "difficulty": "Easy",
     "points": 150,
     "brief": "Someone is impersonating Klumgongyn, our alien liaison. The real Klumgongyn always names his home planet when he signs a message. Which planet is that?",
-    "hint": "Consult the SERPENT lore briefing.",
-    "answer": "varnyr"
+    "hint": "Consult the SERPENT lore briefing."
   },
   {
     "slug": "rack-radiation",
@@ -29,8 +27,7 @@
     "difficulty": "Medium",
     "points": 250,
     "brief": "The server rack in the lab is blinking a warning pattern. The failing unit's serial starts with the same letters as our agency acronym. What are the first three letters of 'Special Espionage Reconnaissance Protection Enforcement Neutralization Taskforce'?",
-    "hint": "Take the first letter of each main word.",
-    "answer": "ser"
+    "hint": "Take the first letter of each main word."
   },
   {
     "slug": "ghost-ship",
@@ -40,8 +37,7 @@
     "difficulty": "Hard",
     "points": 400,
     "brief": "A cargo vessel went dark in the Baltic after leaving a Finnish port. Using public AIS history sites, determine how many digits a full IMO number has.",
-    "hint": "IMO numbers are a 7-digit identifier.",
-    "answer": "7"
+    "hint": "IMO numbers are a 7-digit identifier."
   },
   {
     "slug": "forensic-first-contact",
@@ -51,8 +47,7 @@
     "difficulty": "Medium",
     "points": 250,
     "brief": "A photograph recovered from a suspect's post shows the sun setting over open water. If genuine, the camera was facing roughly which cardinal direction in the evening? (north/south/east/west)",
-    "hint": "The sun sets in the west everywhere on Earth.",
-    "answer": "west"
+    "hint": "The sun sets in the west everywhere on Earth."
   },
   {
     "slug": "serpents-cipher",
@@ -62,7 +57,6 @@
     "difficulty": "Easy",
     "points": 100,
     "brief": "The door keypad at HQ blinks at you. The passcode is the number of letters in the name of SERPENT's alien liaison. How many letters are in 'Klumgongyn'?",
-    "hint": "Count carefully: K-l-u-m-g-o-n-g-y-n.",
-    "answer": "10"
+    "hint": "Count carefully: K-l-u-m-g-o-n-g-y-n."
   }
 ]

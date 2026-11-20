@@ -28,8 +28,9 @@ const MAP = [
 // Central contract console (interactive hotspot)
 const CONSOLE = { x: 8, y: 8 };
 
-// Contract content (public form; in dev mode answers are checked locally,
-// in prod the Supabase Edge Function checks them server-side).
+// Contract content (public form only; answers NEVER ship to the client.
+// In prod the Supabase Edge Function checks them; in local dev a
+// gitignored answers.dev.json provides them and is never deployed.)
 interface Contract {
   slug: string;
   emoji: string;
@@ -39,7 +40,6 @@ interface Contract {
   points: number;
   brief: string;
   hint: string;
-  answer?: string;
 }
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -63,6 +63,7 @@ window.addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
 const player = { x: 9.5, y: 10.5, speed: 3.2 }; // tile units, y is row
 
 let contracts: Contract[] = [];
+const devAnswers: Record<string, string> = {};
 const solved = new Set<string>();
 let score = 0;
 let attempts = 0;
@@ -79,6 +80,14 @@ function walkable(x: number, y: number): boolean {
 async function loadContracts() {
   const res = await fetch("/content/contracts/index.json");
   contracts = await res.json();
+}
+
+async function loadDevAnswers() {
+  // Local dev only; 404 in production (where VITE_CHECK_ANSWER_URL is set).
+  try {
+    const r = await fetch("/content/contracts/answers.dev.json");
+    if (r.ok) Object.assign(devAnswers, await r.json());
+  } catch { /* file absent: prod or fresh clone */ }
 }
 
 function nearConsole(): boolean {
@@ -194,9 +203,10 @@ async function checkAnswer(c: Contract, answer: string): Promise<{ correct: bool
     });
     return res.json();
   }
-  // DEV MODE: local compare (strip answers from index.json in prod builds!)
+  // DEV MODE: local compare against the gitignored answers.dev.json.
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
-  return { correct: !!c.answer && norm(c.answer) === norm(answer) };
+  const ans = devAnswers[c.slug];
+  return { correct: !!ans && norm(ans) === norm(answer) };
 }
 
 (document.getElementById("cd-submit") as HTMLElement).onclick = async () => {
@@ -240,4 +250,4 @@ async function checkAnswer(c: Contract, answer: string): Promise<{ correct: bool
 const agent = new URLSearchParams(location.search).get("agent") || "Agent K";
 agentEl.textContent = agent;
 scoreEl.textContent = "0 pts";
-loadContracts().then(() => requestAnimationFrame(update));
+loadContracts().then(() => { loadDevAnswers(); return requestAnimationFrame(update); });
