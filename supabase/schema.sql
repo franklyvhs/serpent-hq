@@ -1,5 +1,5 @@
 -- ============================================================
--- SERPENT HQ (a Hacktoria game) — Supabase schema v0.4
+-- SERPENT HQ (a Hacktoria game) — Supabase schema v0.4.1
 -- Run this once in the Supabase SQL editor (see docs/RUNBOOK.md).
 -- ============================================================
 
@@ -118,7 +118,7 @@ insert into public.contracts (slug, emoji, title, discipline, difficulty, points
   ('impostor-handler', '🥸', 'The Impostor Handler', 'Social', 'Easy', 150, 20),
   ('rack-radiation', '💾', 'Rack Radiation', 'Data', 'Medium', 250, 30),
   ('forensic-first-contact', '🔎', 'Forensic First Contact', 'Forensics', 'Medium', 250, 40),
-  ('serpents-cipher', '🧩', 'The Serpent's Cipher', 'Logic', 'Easy', 100, 50),
+  ('serpents-cipher', '🧩', 'The Serpent''s Cipher', 'Logic', 'Easy', 100, 50),
   ('ghost-ship', '🚢', 'Ghost Ship of the Gulf', 'Maritime', 'Hard', 400, 60)
 on conflict (slug) do nothing;
 
