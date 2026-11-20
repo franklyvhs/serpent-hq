@@ -4,8 +4,8 @@ Follow this top to bottom. Nothing here needs secrets pasted anywhere except
 the places marked ⚠️ (your own dashboards/terminals, never into chat or the repo).
 
 ## 0. Prerequisites
-- [ ] GitHub repo `serpent-hq` (private, exists)
-- [ ] Vercel account connected to GitHub
+- [ ] GitHub repo `serpent-hq` (public, exists)
+- [ ] Vercel account connected to GitHub (project deployed, play.hacktoria.com live)
 - [ ] Supabase account: https://supabase.com → New project
       - Name: `serpent-hq`, region: EU Central, strong DB password (⚠️ store in a password manager)
 
@@ -17,15 +17,14 @@ the places marked ⚠️ (your own dashboards/terminals, never into chat or the 
    add a row using `supabase/functions/check-answer/GENERATE_HASHES.md` to compute
    the SHA-256 of each normalized answer (⚠️ do this only in the dashboard; never
    commit hashes to the repo).
-   - `ghost-domain` → 2019 · `impostor-handler` → varnyr · `rack-radiation` → ser
+   - `ghost-domain` → 2021 · `impostor-handler` → varnyr · `rack-radiation` → ser
    - `forensic-first-contact` → west · `serpents-cipher` → 10 · `ghost-ship` → 7
 
 ## 2. Auth (magic links only)
 1. Dashboard → **Authentication → Providers → Email**: ensure **Confirm email** is ON
    (this is what makes magic links work).
 2. Leave signup open for the beta.
-3. Under **Authentication → URL Configuration**, set Site URL to your final game URL
-   (e.g. `https://play.hacktoria.com`) once it exists.
+3. Under **Authentication → URL Configuration**, set Site URL to `https://play.hacktoria.com`.
 
 ## 3. Answer-check Edge Function
 In the dashboard: **Edge Functions → New Function → name it `check-answer`**, paste
@@ -36,20 +35,15 @@ Test (expect `{"error":"unauthorized"}`):
 `curl -X POST <function-url> -H 'Content-Type: application/json' -d '{"slug":"x","answer":"y"}'`
 
 ## 4. Deploy the game
-1. Vercel → **Add New → Project → import `serpent-hq`**. Defaults are fine → Deploy.
-2. Vercel → Project → **Settings → Environment Variables**, add:
+1. Vercel → Project → **Settings → Environment Variables**, add:
    - `VITE_SUPABASE_URL` = your project URL (Settings → API)
    - `VITE_SUPABASE_ANON_KEY` = the anon/public key (safe to expose)
    - `VITE_CHECK_ANSWER_URL` = the Edge Function URL from step 3
    - ⚠️ Never add the service-role key anywhere in Vercel.
-3. Redeploy once so the env vars are picked up.
+2. Redeploy once so the env vars are picked up.
 
-## 5. Domain
-In your DNS panel for hacktoria.com add:
-```
-play  CNAME  cname.vercel-dns.com.
-```
-Then Vercel → Project → Domains → add `play.hacktoria.com`.
+## 5. Domain (done)
+`play` CNAME → `cname.vercel-dns.com.` and `play.hacktoria.com` added in Vercel.
 
 ## 6. Local development
 ```

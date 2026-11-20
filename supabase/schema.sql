@@ -115,4 +115,4 @@ on conflict (slug) do nothing;
 
 -- NOTE: seed contract_answers out-of-band (do not commit hashes to the repo).
 -- Helper for generating them, run locally per contract:
---   select encode(digest(lower(trim('2019')), 'sha256'), 'hex');
+--   select encode(digest(lower(trim('2021')), 'sha256'), 'hex');

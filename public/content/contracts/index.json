@@ -8,7 +8,7 @@
     "points": 100,
     "brief": "A SERPENT informant received an email from 'collector@hacktoria.com' but suspects it's not really us. Check the public WHOIS record of hacktoria.com. Reply with the registration year.",
     "hint": "Any public WHOIS service will show the creation date.",
-    "answer": "2019"
+    "answer": "2021"
   },
   {
     "slug": "impostor-handler",

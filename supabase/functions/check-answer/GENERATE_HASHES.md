@@ -6,20 +6,20 @@ never plain text. Normalize = `trim` + `lowercase` + collapse internal whitespac
 Compute a hash locally (any machine with Python):
 
 ```sh
-python3 -c "import hashlib; print(hashlib.sha256('2019'.strip().lower().encode()).hexdigest())"
+python3 -c "import hashlib; print(hashlib.sha256('2021'.strip().lower().encode()).hexdigest())"
 ```
 
 Or in the Supabase SQL editor:
 
 ```sql
-select encode(digest(lower(trim('2019')), 'sha256'), 'hex');
+select encode(digest(lower(trim('2021')), 'sha256'), 'hex');
 ```
 
 Then in Supabase → Table Editor → `contract_answers`, insert:
 
 | contract_slug | answer_hash | alias_hashes |
 |---|---|---|
-| ghost-domain | (hash of `2019`) | `[]` |
+| ghost-domain | (hash of `2021`) | `[]` |
 
 For aliases (accepted alternative spellings), add a separate hash string per alias
 in the JSON array: `["hash1", "hash2"]`.
