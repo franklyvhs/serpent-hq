@@ -6,15 +6,15 @@
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase.
 // Client: { slug, answer } + Authorization: Bearer <jwt>
 // Returns: { correct, points?, firstSolve?, error? }
-// CORS: the game runs on play.hacktoria.com, so every response
-// carries permissive CORS headers and OPTIONS is answered directly.
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("ANON_KEY")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const ANON_KEY = Deno.env.get("ANON_KEY") ?? "";
+
+console.log("env check: url?", !!SUPABASE_URL, "service key length:", SERVICE_KEY.length, "anon key length:", ANON_KEY.length);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-  // Rate limit: count this user's submissions in the recent window.
+  // Rate limit.
   const since = new Date(Date.now() - RATE_LIMIT.windowSeconds * 1000).toISOString();
   const { count } = await admin
     .from("submissions")
@@ -79,23 +79,34 @@ Deno.serve(async (req) => {
     return json({ error: "rate limited, slow down Agent" }, 429);
   }
 
-  // Fetch the secret answer row (service role bypasses RLS).
-  const { data: row } = await admin
+  // Lookup 1: the secret answer row. Distinct error if missing,
+  // so we can tell seeding problems apart from metadata problems.
+  const { data: row, error: rowErr } = await admin
     .from("contract_answers")
     .select("answer_hash, alias_hashes")
     .eq("contract_slug", slug)
     .maybeSingle();
+  if (rowErr) {
+    console.log("answers query error:", rowErr.message);
+    return json({ error: "answer lookup failed: " + rowErr.message }, 500);
+  }
   if (!row) {
-    return json({ error: "unknown contract" }, 404);
+    console.log("answers row missing for slug=" + slug + " (service key len " + SERVICE_KEY.length + ")");
+    return json({ error: "no answer seeded for this contract" }, 404);
   }
 
-  const { data: contract } = await admin
+  // Lookup 2: contract metadata (points + enabled).
+  const { data: contract, error: cErr } = await admin
     .from("contracts")
     .select("points, enabled")
     .eq("slug", slug)
     .maybeSingle();
+  if (cErr) {
+    console.log("contracts query error:", cErr.message);
+    return json({ error: "contract lookup failed: " + cErr.message }, 500);
+  }
   if (!contract?.enabled) {
-    return json({ error: "unknown contract" }, 404);
+    return json({ error: "contract metadata missing" }, 404);
   }
 
   const guess = await sha256Hex(normalize(answer));
