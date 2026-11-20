@@ -1,5 +1,5 @@
 -- ============================================================
--- SERPENT HQ (a Hacktoria game) — Supabase schema v0.3
+-- SERPENT HQ (a Hacktoria game) — Supabase schema v0.4
 -- Run this once in the Supabase SQL editor (see docs/RUNBOOK.md).
 -- ============================================================
 
@@ -103,9 +103,13 @@ create policy "enabled contracts are public" on public.contracts for select usin
 -- contract_answers: NO policies => inaccessible to all clients.
 -- Only the service-role Edge Function can read it.
 
--- submissions: no client policies at all; only the service-role
--- Edge Function writes. The leaderboard view runs with owner rights,
--- so grant public read explicitly:
+-- submissions: agents can read their OWN row history (score restore);
+-- writes happen only via the service-role Edge Function.
+create policy "agents read own submissions"
+  on public.submissions for select
+  using (auth.uid() = profile_id);
+
+-- The leaderboard view runs with owner rights, so grant public read explicitly:
 grant select on public.leaderboard to anon, authenticated;
 
 -- ---------- seed contracts ----------
@@ -114,7 +118,7 @@ insert into public.contracts (slug, emoji, title, discipline, difficulty, points
   ('impostor-handler', '🥸', 'The Impostor Handler', 'Social', 'Easy', 150, 20),
   ('rack-radiation', '💾', 'Rack Radiation', 'Data', 'Medium', 250, 30),
   ('forensic-first-contact', '🔎', 'Forensic First Contact', 'Forensics', 'Medium', 250, 40),
-  ('serpents-cipher', '🧩', 'The Serpent''s Cipher', 'Logic', 'Easy', 100, 50),
+  ('serpents-cipher', '🧩', 'The Serpent's Cipher', 'Logic', 'Easy', 100, 50),
   ('ghost-ship', '🚢', 'Ghost Ship of the Gulf', 'Maritime', 'Hard', 400, 60)
 on conflict (slug) do nothing;
 
