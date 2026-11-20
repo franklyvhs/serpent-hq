@@ -1,46 +1,74 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SERPENT HQ — a Hacktoria game</title>
-    <link rel="stylesheet" href="/src/styles.css" />
-  </head>
-  <body>
-    <div id="app">
-      <div id="hud">
-        <span class="logo">HACKTORIA presents <em>SERPENT HQ</em></span>
-        <span id="hud-agent">unassigned</span>
-        <span id="hud-score">0 pts</span>
-      </div>
-      <div id="stage">
-        <canvas id="game" width="640" height="448"></canvas>
-        <div id="prompt" class="hidden">Press E to open the Contract Console</div>
-      </div>
-      <p id="footnote">WASD / arrow keys to move · E to interact</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SERPENT HQ: walk the headquarters, solve real-world OSINT contracts, climb the scoreboard. A Hacktoria game." />
+  <title>SERPENT HQ — a Hacktoria game</title>
+</head>
+<body>
+  <div id="game-wrap">
+    <canvas id="game" width="640" height="448"></canvas>
+    <div id="center-dot"></div>
+    <div id="prompt" class="hidden">Press E to open the Contract Console</div>
+    <div id="hud">
+      <span id="hud-agent">Agent K</span>
+      <span id="hud-score">0 pts</span>
     </div>
+    <div id="movement-controls">WASD / arrow keys to move · E to interact</div>
 
-    <div id="console-modal" class="hidden">
-      <div id="console-inner">
-        <header>
-          <h2>CONTRACT CONSOLE <button id="console-close" title="Close">✕</button></h2>
-        </header>
-        <div id="console-body">
-          <ul id="contract-list"></ul>
-          <div id="contract-detail" class="hidden">
-            <h3 id="cd-title"></h3>
-            <div id="cd-meta"></div>
-            <p id="cd-brief"></p>
-            <p id="cd-hint" class="hidden"></p>
-            <input id="cd-answer" placeholder="Your answer…" autocomplete="off" />
-            <button id="cd-submit">SUBMIT</button>
-            <p id="cd-feedback"></p>
-            <button id="cd-back">← back to list</button>
-          </div>
+    <!-- Auth overlay: magic link -->
+    <div id="auth-overlay" class="hidden">
+      <div id="auth-card">
+        <p id="auth-eyebrow">HACKTORIA presents</p>
+        <h1 id="auth-title">SERPENT HQ</h1>
+        <p id="auth-status">Enter your email to receive a magic link and sign in as a SERPENT agent.</p>
+        <div id="auth-form">
+          <input id="auth-email" type="email" placeholder="agent@example.com" autocomplete="email" />
+          <button id="auth-btn">SEND MAGIC LINK</button>
         </div>
       </div>
     </div>
 
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <!-- Contract console -->
+    <div id="console-modal" class="hidden">
+      <div class="console-head">
+        <h3 id="console-title">CONTRACT CONSOLE</h3>
+        <button id="console-close" title="Close">✕</button>
+      </div>
+      <div id="console-tabs">
+        <button class="tab active" data-tab="contracts">CONTRACTS</button>
+        <button class="tab" data-tab="leaderboard">LEADERBOARD</button>
+        <button class="tab" data-tab="agent">AGENT ID</button>
+      </div>
+
+      <ul id="contract-list"></ul>
+
+      <div id="contract-detail" class="hidden">
+        <button id="cd-back" class="linklike">← back to list</button>
+        <h4 id="cd-title"></h4>
+        <p id="cd-meta"></p>
+        <p id="cd-brief"></p>
+        <p id="cd-hint" class="hidden"></p>
+        <input id="cd-answer" placeholder="your answer" autocomplete="off" />
+        <button id="cd-submit">SUBMIT</button>
+        <p id="cd-feedback"></p>
+      </div>
+
+      <div id="leaderboard" class="hidden">
+        <ol id="leaderboard-list"></ol>
+      </div>
+
+      <div id="agent-id" class="hidden">
+        <p class="agent-label">CODENAME</p>
+        <input id="codename-input" maxlength="24" autocomplete="off" />
+        <button id="codename-save">RENAME</button>
+        <p id="codename-feedback"></p>
+        <hr />
+        <button id="logout-btn" class="danger">SIGN OUT</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
 </html>
