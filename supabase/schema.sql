@@ -1,5 +1,5 @@
 -- ============================================================
--- SERPENT HQ (a Hacktoria game) — Supabase schema v0.1
+-- SERPENT HQ (a Hacktoria game) — Supabase schema v0.2
 -- Run this once in the Supabase SQL editor (see docs/RUNBOOK.md).
 -- ============================================================
 
@@ -59,9 +59,14 @@ create table public.submissions (
   profile_id uuid not null references public.profiles(id) on delete cascade,
   contract_slug text not null references public.contracts(slug) on delete cascade,
   correct boolean not null,
-  submitted_at timestamptz not null default now(),
-  unique (profile_id, contract_slug) where correct  -- no double points
+  submitted_at timestamptz not null default now()
 );
+
+-- Partial unique index: only one CORRECT submission per user per contract
+-- (a UNIQUE constraint with WHERE is invalid in CREATE TABLE, hence this).
+create unique index submissions_unique_correct
+  on public.submissions (profile_id, contract_slug)
+  where correct;
 
 create index submissions_profile_idx on public.submissions (profile_id, submitted_at desc);
 create index submissions_attempt_rate_idx on public.submissions (profile_id, submitted_at);
