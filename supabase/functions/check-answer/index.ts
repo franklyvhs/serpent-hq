@@ -2,8 +2,10 @@
 // SERPENT HQ — check-answer Edge Function (Deno)
 // Deploy: supabase functions deploy check-answer
 // Required secrets (names may NOT start with SUPABASE_):
-//   ANON_KEY  (publishable/anon key from Settings → API)
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase.
+//   ANON_KEY         (publishable/anon key from Settings → API)
+//   SERVICE_ROLE_KEY (legacy service_role key — only if the injected
+//                     SUPABASE_SERVICE_ROLE_KEY is absent on your
+//                     platform; check the Logs line "env check")
 // Client: { slug, answer } + Authorization: Bearer <jwt>
 // Returns: { correct, points?, firstSolve?, error? }
 // ============================================================
@@ -11,10 +13,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const ANON_KEY = Deno.env.get("ANON_KEY") ?? "";
+// Prefer Supabase's injected service key; fall back to a custom secret
+// on platforms where the injection is not available.
+const SERVICE_KEY =
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SERVICE_ROLE_KEY") ||
+  "";
+const ANON_KEY = Deno.env.get("ANON_KEY") || "";
 
-console.log("env check: url?", !!SUPABASE_URL, "service key length:", SERVICE_KEY.length, "anon key length:", ANON_KEY.length);
+console.log(
+  "env check: url?", !!SUPABASE_URL,
+  "service key length:", SERVICE_KEY.length,
+  "anon key length:", ANON_KEY.length,
+);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -79,19 +90,17 @@ Deno.serve(async (req) => {
     return json({ error: "rate limited, slow down Agent" }, 429);
   }
 
-  // Lookup 1: the secret answer row. Distinct error if missing,
-  // so we can tell seeding problems apart from metadata problems.
+  // Lookup 1: the secret answer row.
   const { data: row, error: rowErr } = await admin
     .from("contract_answers")
     .select("answer_hash, alias_hashes")
     .eq("contract_slug", slug)
     .maybeSingle();
   if (rowErr) {
-    console.log("answers query error:", rowErr.message);
+    console.log("answers query error:", rowErr.message, "(service key length:", SERVICE_KEY.length + ")");
     return json({ error: "answer lookup failed: " + rowErr.message }, 500);
   }
   if (!row) {
-    console.log("answers row missing for slug=" + slug + " (service key len " + SERVICE_KEY.length + ")");
     return json({ error: "no answer seeded for this contract" }, 404);
   }
 
