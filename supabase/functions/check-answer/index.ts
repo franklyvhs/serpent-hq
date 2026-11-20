@@ -1,12 +1,13 @@
 // ============================================================
 // SERPENT HQ — check-answer Edge Function (Deno)
 // Deploy: supabase functions deploy check-answer
-// Required secrets (set via the dashboard, names may NOT start
-// with SUPABASE_ — that prefix is reserved):
-//   ANON_KEY  (the publishable/anon key from Settings → API)
+// Required secrets (names may NOT start with SUPABASE_):
+//   ANON_KEY  (publishable/anon key from Settings → API)
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected by Supabase.
-// Client sends: { slug, answer } with an Authorization: Bearer <jwt>
+// Client: { slug, answer } + Authorization: Bearer <jwt>
 // Returns: { correct, points?, firstSolve?, error? }
+// CORS: the game runs on play.hacktoria.com, so every response
+// carries permissive CORS headers and OPTIONS is answered directly.
 // ============================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -14,6 +15,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("ANON_KEY")!;
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 function normalize(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -27,18 +34,23 @@ async function sha256Hex(s: string): Promise<string> {
 const RATE_LIMIT = { maxAttempts: 12, windowSeconds: 300 };
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS });
+  }
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method not allowed" }), { status: 405 });
+    return json({ error: "method not allowed" }, 405);
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  // Verify the caller's JWT by using it as the client's auth:
   const userClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: userData, error: userErr } = await userClient.auth.getUser();
   if (userErr || !userData?.user) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    return json({ error: "unauthorized" }, 401);
   }
   const profileId = userData.user.id;
 
@@ -46,12 +58,12 @@ Deno.serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "bad request" }), { status: 400 });
+    return json({ error: "bad request" }, 400);
   }
   const slug = String(body.slug ?? "");
   const answer = String(body.answer ?? "");
   if (!slug || !answer) {
-    return new Response(JSON.stringify({ error: "slug and answer required" }), { status: 400 });
+    return json({ error: "slug and answer required" }, 400);
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -64,7 +76,7 @@ Deno.serve(async (req) => {
     .eq("profile_id", profileId)
     .gte("submitted_at", since);
   if ((count ?? 0) >= RATE_LIMIT.maxAttempts) {
-    return new Response(JSON.stringify({ error: "rate limited, slow down Agent" }), { status: 429 });
+    return json({ error: "rate limited, slow down Agent" }, 429);
   }
 
   // Fetch the secret answer row (service role bypasses RLS).
@@ -74,24 +86,22 @@ Deno.serve(async (req) => {
     .eq("contract_slug", slug)
     .maybeSingle();
   if (!row) {
-    return new Response(JSON.stringify({ error: "unknown contract" }), { status: 404 });
+    return json({ error: "unknown contract" }, 404);
   }
 
-  // Also load the contract for points + enabled flag.
   const { data: contract } = await admin
     .from("contracts")
     .select("points, enabled")
     .eq("slug", slug)
     .maybeSingle();
   if (!contract?.enabled) {
-    return new Response(JSON.stringify({ error: "unknown contract" }), { status: 404 });
+    return json({ error: "unknown contract" }, 404);
   }
 
   const guess = await sha256Hex(normalize(answer));
   const hashes: string[] = [row.answer_hash, ...JSON.parse(row.alias_hashes ?? "[]")];
   const correct = hashes.includes(guess);
 
-  let alreadySolved = false;
   if (correct) {
     const { data: existing } = await admin
       .from("submissions")
@@ -100,24 +110,23 @@ Deno.serve(async (req) => {
       .eq("contract_slug", slug)
       .eq("correct", true)
       .maybeSingle();
-    alreadySolved = !!existing;
-    if (!alreadySolved) {
-      await admin.from("submissions").insert({
-        profile_id: profileId,
-        contract_slug: slug,
-        correct: true,
-      });
-      return Response.json({ correct: true, points: contract.points, firstSolve: true });
+    if (existing) {
+      return json({ correct: true, firstSolve: false });
     }
-    return Response.json({ correct: true, firstSolve: false });
+    await admin.from("submissions").insert({
+      profile_id: profileId,
+      contract_slug: slug,
+      correct: true,
+    });
+    return json({ correct: true, points: contract.points, firstSolve: true });
   }
 
-  // Log failed attempt (used for rate limiting + hint gating client-side).
+  // Log failed attempt (rate limiting + hint gating).
   await admin.from("submissions").insert({
     profile_id: profileId,
     contract_slug: slug,
     correct: false,
   });
 
-  return Response.json({ correct: false, firstSolve: false });
+  return json({ correct: false });
 });
