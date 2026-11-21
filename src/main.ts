@@ -75,7 +75,7 @@ const SLICE_WALK: Record<string, number> = { right: 112, up: 118, left: 124, dow
 // The LimeZu sheet bakes reflection art into the rows below the walk
 // band. The 32.8px slice walk window (sheet y65.6..98.4) reaches into
 // that strip on two frames (up step 2, left step 0), showing stray
-pixels under the character. Clip the window at y96 while walking.
+// pixels under the character. Clip the window at y96 while walking.
 const SPRITE_ROW_H = 32.8;   // 656 / 20 slice rows
 const WALK_WIN_H = 30.4;    // 96 - 65.6
 const FULL_QUAD = k.quad(0, 0, 1, 1);
