@@ -1,4 +1,4 @@
-// ============================================================
+successfully downloaded text file (SHA: 76420d92daf27fe27b3400c0e141c5f97175579d)// ============================================================
 // SERPENT HQ — v0.5 (a Hacktoria game)
 // Fullscreen cover-crop presentation: the canvas fills the browser,
 // integer camera zoom, camera snaps at map edges (no black bars).
@@ -69,16 +69,17 @@ let facing: "right" | "up" | "left" | "down" = "down";
 let walkTimer = 0; // seconds, drives the manual walk animation
 let idleTimer = 0; // seconds, drives the idle sway while standing
 const range = (n: number) => Array.from({ length: n }, (_i) => _i);
-// Agent K uses one small sheet per animation (idle/walk, 24 columns:
-// six frames per direction, order right/up/left/down). Frame 0 of each
-// direction in the idle sheet doubles as the standing pose.
+// Agent K is one whole-set sheet from the LimeZu Character Generator
+// (serpent_agent_k.png, 896x640 = 56x20 slices of 16x32). Row 0 is the
+// static band (frames 0-3: right/up/left/down), row 1 the idle sway,
+// row 2 the walk cycle. Inside an animation band, frames group by
+// direction, six frames each, order right/up/left/down; frame 0 of each
+// idle direction doubles as the standing pose.
 const ANIM_FRAME: Record<string, number> = { right: 0, up: 6, left: 12, down: 18 };
+const IDLE_ROW = 1 * 56; // slice index where the idle band starts
+const WALK_ROW = 2 * 56; // slice index where the walk band starts
 const WALK_FPS = 10; // walk animation, frames per second
 const IDLE_FPS = 4;  // idle sway, frames per second
-// Lesson learned the hard way: the LimeZu Character Generator's
-// whole-set export writes scrambled pixel fragments (verified by pixel
-// analysis); single-animation exports are clean. Keep one file per
-// animation and pixel-check sheets before they ship.
 
 // ---------- generic interactables ----------
 // Any named point object in the map's "Objects" layer can become an
@@ -177,27 +178,20 @@ async function buildWorld() {
   if (c) consolePos = { x: c.x, y: c.y };
   fitCamera();
 
-  // Agent K, generated with the LimeZu Character Generator as one
-  // PNG per animation (reliable; the whole-set export was scrambled).
-  // Both sheets are 384x32: 24 frames = 6 frames per direction,
-  // order right/up/left/down (same slice loader as the map tilesets;
-  // a custom `frames` quad array renders blank outside the sheet's
-  // top-left 64x64 px, root cause unknown - keep using slices).
+  // Agent K: the whole-set generator export, one PNG. (Earlier this ran
+  // as one PNG per animation, and before that as a `frames` quad array —
+  // the quad path renders blank outside the sheet's top-left 64x64 px,
+  // root cause unknown; slices work everywhere, keep using slices.)
   await k.loadSprite(
-    "ak-walk",
-    "/assets/characters/serpent_agent_k_walk.png",
-    { sliceX: 24, sliceY: 1 },
-  );
-  await k.loadSprite(
-    "ak-idle",
-    "/assets/characters/serpent_agent_k_idle.png",
-    { sliceX: 24, sliceY: 1 },
+    "ak",
+    "/assets/characters/serpent_agent_k.png",
+    { sliceX: 56, sliceY: 20 },
   );
 
   // The walk-cycle renderer; hidden while standing (idleObj shows then).
   playerObj = k.add([
     k.pos(player.x, player.y),
-    k.sprite("ak-walk", { frame: ANIM_FRAME.down }),
+    k.sprite("ak", { frame: WALK_ROW + ANIM_FRAME.down }),
     k.anchor("bot"),
   ]);
   // `hidden` is a built-in game-object property in kaplay; setting it
@@ -207,7 +201,7 @@ async function buildWorld() {
   // Standing/idle renderer; visible while not moving.
   idleObj = k.add([
     k.pos(player.x, player.y),
-    k.sprite("ak-idle", { frame: ANIM_FRAME.down }),
+    k.sprite("ak", { frame: IDLE_ROW + ANIM_FRAME.down }),
     k.anchor("bot"),
   ]);
 
@@ -249,7 +243,7 @@ async function buildWorld() {
       walkTimer += dt;
       idleTimer = 0;
       playerObj.frame =
-        ANIM_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
+        WALK_ROW + ANIM_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
     } else {
       // Standing: gentle idle sway; frame 0 is the plain standing pose.
       playerObj.hidden = true;
@@ -257,7 +251,7 @@ async function buildWorld() {
       walkTimer = 0;
       idleTimer += dt;
       idleObj.frame =
-        ANIM_FRAME[facing] + (Math.floor(idleTimer * IDLE_FPS) % 6);
+        IDLE_ROW + ANIM_FRAME[facing] + (Math.floor(idleTimer * IDLE_FPS) % 6);
     }
     updateCamera();
     if (toastActive) {
