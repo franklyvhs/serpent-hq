@@ -25,7 +25,7 @@ interface Contract {
 // ---------- DOM ----------
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const promptEl = document.getElementById("prompt")!;
-document.title = "SERPENT HQ - dbg-walk-1";
+document.title = "SERPENT HQ - dbg-walk-2";
 const modal = document.getElementById("console-modal")!;
 const listEl = document.getElementById("contract-list")!;
 const detailEl = document.getElementById("contract-detail")!;
@@ -184,6 +184,11 @@ async function buildWorld() {
   await k.loadSprite(
     "player",
     "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png",
+    { frames, singular: true },
+  );
+  await k.loadSprite(
+    "player-atlas",
+    "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png",
     { frames },
   );
 
@@ -206,15 +211,18 @@ async function buildWorld() {
     ]);
   }
 
-  // DEBUG strip (dbg-walk-1): screen-space row of frames, fixed = ignores
-  // camera. 0-3 static, 4/10/27 idle band, 28/34/40/46/51 walk band.
+  // DEBUG strip (dbg-walk-2): two screen-space rows of frames.
+  // Top row = singular sprite (own GL texture), bottom = atlas-packed.
+  // 0-3 static, 4/10/27 idle band, 28/34/40/46/51 walk band.
   const testFrames = [0, 1, 2, 3, 4, 10, 27, 28, 34, 40, 46, 51];
   for (let i = 0; i < testFrames.length; i++) {
-    k.add([
-      k.fixed(),
-      k.pos(16 + i * 20, 60),
-      k.sprite("player", { frame: testFrames[i] }),
-    ]);
+    for (let j = 0; j < 2; j++) {
+      k.add([
+        k.fixed(),
+        k.pos(16 + i * 20, 60 + j * 40),
+        k.sprite(j === 0 ? "player" : "player-atlas", { frame: testFrames[i] }),
+      ]);
+    }
   }
 
   k.onUpdate(() => {
@@ -234,10 +242,11 @@ async function buildWorld() {
     else if (dy < 0) facing = "up";
     const moving = dx !== 0 || dy !== 0;
     if (moving) {
-      // DEBUG (dbg-walk-1): keep the static pose while moving, to test
-      // whether invisibility comes from the walk frames or from movement.
+      // dbg-walk-2: walk cycle is back; player uses the singular
+      // (own-texture) sprite, strip top row.
       walkTimer += dt;
-      playerObj.frame = STATIC_FRAME[facing];
+      playerObj.frame =
+        WALK_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
     } else {
       walkTimer = 0;
       playerObj.frame = STATIC_FRAME[facing];
