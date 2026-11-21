@@ -63,7 +63,49 @@ const INTERACT_RANGE = 22; // px
 let world: TiledWorld;
 const player = { x: 0, y: 0 }; // px
 let playerObj: any;
-let consolePos: Vec = { x: 0, y: 0 };
+let consolePos: Vec = { x: 0, y: 0 }; // legacy spot ref (kept for compatibility)
+let facing: "right" | "up" | "left" | "down" = "down";
+const range = (n: number) => Array.from({ length: n }, (_i) => _i);
+const STATIC_FRAME: Record<string, number> = { right: 0, up: 1, left: 2, down: 3 };
+
+// ---------- generic interactables ----------
+// Any named point object in the map's "Objects" layer can become an
+// interactable: give it an entry here (label + behavior).
+interface Hotspot { name: string; x: number; y: number; }
+let hotspots: Hotspot[] = [];
+let toastActive = false;
+let toastUntil = 0;
+
+function toast(msg: string) {
+  promptEl.textContent = msg;
+  promptEl.classList.remove("hidden");
+  toastActive = true;
+  toastUntil = performance.now() + 3200;
+}
+
+const INTERACTABLES: Record<string, { label: string; action: () => void }> = {
+  "contract-console": { label: "Mission console", action: () => openConsole() },
+  "notice-board": {
+    label: "HQ notice board",
+    action: () => toast("The board reads: \"Trust no one. Verify everything. New contracts drop Fridays.\""),
+  },
+  "coffee-machine": {
+    label: "Coffee machine",
+    action: () => toast("The machine sputters to life. Morale restored. Back to work, Agent."),
+  },
+};
+
+function nearestInteractable(): { spot: Hotspot; def: { label: string; action: () => void } } | null {
+  let best: { spot: Hotspot; def: { label: string; action: () => void } } | null = null;
+  let bestD = INTERACT_RANGE;
+  for (const spot of hotspots) {
+    const def = INTERACTABLES[spot.name];
+    if (!def) continue;
+    const d = Math.max(Math.abs(player.x - spot.x), Math.abs(player.y - spot.y));
+    if (d <= bestD) { bestD = d; best = { spot, def }; }
+  }
+  return best;
+}
 
 // ---------- camera: fullscreen cover-crop with edge snap ----------
 // The camera zoom is an integer (world px -> screen px) so pixels stay
@@ -115,10 +157,6 @@ function solidAt(px: number, py: number): boolean {
   return world.solid[ty * world.mapW + tx] === 1;
 }
 
-function nearInteract(p: Vec): boolean {
-  return Math.abs(player.x - p.x) <= INTERACT_RANGE && Math.abs(player.y - p.y) <= INTERACT_RANGE;
-}
-
 async function buildWorld() {
   world = await loadTiled(k, "/assets/maps/hq.json");
   player.x = world.spawn.x;
@@ -127,21 +165,49 @@ async function buildWorld() {
   if (c) consolePos = { x: c.x, y: c.y };
   fitCamera();
 
-  // Player placeholder glyph until limezu character sprites land
+  // LimeZu Modern Interiors walk sheet: 16x32 frames. Bands: row 0 =
+  // static [right, up, left, down]; rows 1 (idle) and 2 (walk) hold 6
+  // frames per direction, ordered right/up/left/down. Frames are uv
+  // quads (the sheet is 896x656 -> 56 cols, half-rows of 32px).
+  const FW = 16 / 896, FH = 32 / 656;
+  const q = (col: number, band: number) => ({ x: col * FW, y: band * 32 / 656, w: FW, h: FH });
+  const frames = [
+    q(0, 0), q(1, 0), q(2, 0), q(3, 0), // static right/up/left/down
+    ...range(24).map((i) => q(i, 1)),    // idle  (indices 4-27)
+    ...range(24).map((i) => q(i, 2)),    // walk  (indices 28-51)
+  ];
+  await k.loadSprite(
+    "player",
+    "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png",
+    {
+      frames,
+      anims: {
+        "walk-right": { frames: [28, 29, 30, 31, 32, 33], speed: 10, loop: true },
+        "walk-up": { frames: [34, 35, 36, 37, 38, 39], speed: 10, loop: true },
+        "walk-left": { frames: [40, 41, 42, 43, 44, 45], speed: 10, loop: true },
+        "walk-down": { frames: [46, 47, 48, 49, 50, 51], speed: 10, loop: true },
+      },
+    },
+  );
+
   playerObj = k.add([
     k.pos(player.x, player.y),
-    k.text("\u{1F575}\uFE0F", { size: 12 }),
-    k.anchor("center"),
+    k.sprite("player", { frame: STATIC_FRAME.down }),
+    k.anchor("bot"),
   ]);
 
-  // Interactive highlight on the console hotspot
-  k.add([
-    k.pos(consolePos.x, consolePos.y),
-    k.circle(6),
-    k.color(34, 211, 238),
-    k.opacity(0.35),
-    k.anchor("center"),
-  ]);
+  // Hotspot markers for everything the game knows how to interact with
+  for (const o of world.objects) {
+    if (!INTERACTABLES[o.name]) continue;
+    hotspots.push({ name: o.name, x: o.x, y: o.y });
+    k.add([
+      k.pos(o.x, o.y),
+      k.circle(6),
+      k.color(34, 211, 238),
+      k.opacity(0.35),
+      k.anchor("center"),
+    ]);
+  }
 
   k.onUpdate(() => {
     if (!overlaysDown()) return;
@@ -154,8 +220,34 @@ async function buildWorld() {
     if (dy && !solidAt(player.x, ny)) player.y = ny;
     playerObj.pos.x = player.x;
     playerObj.pos.y = player.y;
+    if (dx > 0) facing = "right";
+    else if (dx < 0) facing = "left";
+    else if (dy > 0) facing = "down";
+    else if (dy < 0) facing = "up";
+    const moving = dx !== 0 || dy !== 0;
+    if (moving) {
+      const anim = "walk-" + facing;
+      const cur = playerObj.getCurAnim();
+      if (!cur || cur.name !== anim) playerObj.play(anim);
+    } else {
+      if (playerObj.getCurAnim()) playerObj.stop();
+      playerObj.frame = STATIC_FRAME[facing];
+    }
     updateCamera();
-    promptEl.classList.toggle("hidden", !nearInteract(consolePos));
+    if (toastActive) {
+      if (performance.now() > toastUntil) {
+        toastActive = false;
+        promptEl.classList.add("hidden");
+      }
+      return;
+    }
+    const near = nearestInteractable();
+    if (near) {
+      promptEl.textContent = "[E] " + near.def.label;
+      promptEl.classList.remove("hidden");
+    } else {
+      promptEl.classList.add("hidden");
+    }
   });
 }
 
@@ -166,7 +258,10 @@ window.addEventListener("keydown", (e) => {
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k2)) e.preventDefault();
   if (e.target instanceof HTMLInputElement) return; // typing in a field
   keys[k2] = true;
-  if (k2 === "e" && overlaysDown() && nearInteract(consolePos)) openConsole();
+  if (k2 === "e" && !e.repeat && overlaysDown()) {
+    const near = nearestInteractable();
+    if (near) near.def.action();
+  }
 });
 window.addEventListener("keyup", (e) => {
   if (e.target instanceof HTMLInputElement) return;
