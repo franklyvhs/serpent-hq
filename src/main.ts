@@ -199,8 +199,11 @@ async function buildWorld() {
     k.pos(player.x, player.y),
     k.sprite("ak-walk", { frame: ANIM_FRAME.down }),
     k.anchor("bot"),
-    { hidden: true },
   ]);
+  // `hidden` is a built-in game-object property in kaplay; setting it
+  // as a component value collides ("Duplicate component property"), so
+  // assign it right after creation instead.
+  playerObj.hidden = true;
   // Standing/idle renderer; visible while not moving.
   idleObj = k.add([
     k.pos(player.x, player.y),
