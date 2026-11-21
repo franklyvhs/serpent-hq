@@ -1,4 +1,4 @@
-successfully downloaded text file (SHA: 76420d92daf27fe27b3400c0e141c5f97175579d)// ============================================================
+// ============================================================
 // SERPENT HQ — v0.5 (a Hacktoria game)
 // Fullscreen cover-crop presentation: the canvas fills the browser,
 // integer camera zoom, camera snaps at map edges (no black bars).
