@@ -43,3 +43,5 @@ docs/RUNBOOK.md         step-by-step deployment
 Add a JSON object to `public/content/contracts/index.json`, and matching rows
 in `contracts` + `contract_answers` (see `docs/RUNBOOK.md` and
 `supabase/functions/check-answer/GENERATE_HASHES.md`).
+
+> Build pipeline note (2026-11-21): Tiled maps must have every tile layer data array at width*height; loader rejects malformed maps.
