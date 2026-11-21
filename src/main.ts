@@ -25,7 +25,7 @@ interface Contract {
 // ---------- DOM ----------
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const promptEl = document.getElementById("prompt")!;
-document.title = "SERPENT HQ - dbg-walk-2";
+document.title = "SERPENT HQ - dbg-walk-3";
 const modal = document.getElementById("console-modal")!;
 const listEl = document.getElementById("contract-list")!;
 const detailEl = document.getElementById("contract-detail")!;
@@ -72,6 +72,9 @@ const STATIC_FRAME: Record<string, number> = { right: 0, up: 1, left: 2, down: 3
 // Walk band (sheet band row 2) frame ranges per direction, first frame of 6.
 const WALK_FRAME: Record<string, number> = { right: 28, up: 34, left: 40, down: 46 };
 const WALK_FPS = 10; // animation speed, frames per second
+// Slice-loaded variant (56 cols x 20 rows): statics 0-3, idle row1 = 56+col,
+// walk row2 = 112+col. First frame of each 6-frame walk cycle:
+const SLICE_WALK: Record<string, number> = { right: 112, up: 118, left: 124, down: 130 };
 
 // ---------- generic interactables ----------
 // Any named point object in the map's "Objects" layer can become an
@@ -187,14 +190,14 @@ async function buildWorld() {
     { frames, singular: true },
   );
   await k.loadSprite(
-    "player-atlas",
+    "player-slice",
     "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png",
-    { frames },
+    { sliceX: 56, sliceY: 20 },
   );
 
   playerObj = k.add([
     k.pos(player.x, player.y),
-    k.sprite("player", { frame: STATIC_FRAME.down }),
+    k.sprite("player-slice", { frame: STATIC_FRAME.down }),
     k.anchor("bot"),
   ]);
 
@@ -211,19 +214,49 @@ async function buildWorld() {
     ]);
   }
 
-  // DEBUG strip (dbg-walk-2): two screen-space rows of frames.
-  // Top row = singular sprite (own GL texture), bottom = atlas-packed.
-  // 0-3 static, 4/10/27 idle band, 28/34/40/46/51 walk band.
+  // DEBUG strip (dbg-walk-3): top row = custom frames (suspected broken),
+  // bottom row = slice-loaded frames (the path the map tilesets use).
   const testFrames = [0, 1, 2, 3, 4, 10, 27, 28, 34, 40, 46, 51];
+  const sliceIdx = testFrames.map((f) => {
+    const band = f < 4 ? 0 : f < 28 ? 1 : 2;
+    const col = f < 4 ? f : (f - 4) % 24;
+    return band * 56 + col;
+    });
   for (let i = 0; i < testFrames.length; i++) {
-    for (let j = 0; j < 2; j++) {
-      k.add([
-        k.fixed(),
-        k.pos(16 + i * 20, 60 + j * 40),
-        k.sprite(j === 0 ? "player" : "player-atlas", { frame: testFrames[i] }),
-      ]);
-    }
+    k.add([k.fixed(), k.pos(16 + i * 20, 60), k.sprite("player", { frame: testFrames[i] })]);
+    k.add([k.fixed(), k.pos(16 + i * 20, 100), k.sprite("player-slice", { frame: sliceIdx[i] })]);
   }
+
+  // DEBUG overlay (dbg-walk-3): report what this browser loads.
+  const pre = document.createElement("pre");
+  pre.style.cssText = "position:fixed;left:8px;bottom:8px;color:#7cffb2;background:rgba(0,0,0,0.78);font:11px/1.45 monospace;padding:6px 8px;z-index:9999;margin:0;pointer-events:none;max-width:60vw";
+  document.body.appendChild(pre);
+  const dbg: Record<string, unknown> = { phase: "init" };
+  const showDbg = () => { pre.textContent = "dbg-walk-3 " + JSON.stringify(dbg); };
+  const playerAsset = (k as any).getSprite("player");
+  if (playerAsset?.data) {
+    const d = playerAsset.data;
+    dbg.tex = [d.tex.width, d.tex.height];
+    dbg.n = d.frames.length;
+    dbg.f4 = { ...d.frames[4] };
+    dbg.f10 = { ...d.frames[10] };
+    dbg.f28 = { ...d.frames[28] };
+  }
+  dbg.phase = "sprite-ok";
+  showDbg();
+  const imgUrl = "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png?nocache=" + Date.now();
+  const img = new Image();
+  img.onload = () => {
+    dbg.img = [img.naturalWidth, img.naturalHeight];
+    showDbg();
+  };
+  img.src = imgUrl;
+  fetch(imgUrl).then(async (r) => {
+    dbg.bytes = (await r.arrayBuffer()).byteLength;
+    dbg.etag = r.headers.get("etag");
+    dbg.phase = "done";
+    showDbg();
+  }).catch(() => { dbg.fetch = "failed"; showDbg(); });
 
   k.onUpdate(() => {
     if (!overlaysDown()) return;
@@ -242,11 +275,11 @@ async function buildWorld() {
     else if (dy < 0) facing = "up";
     const moving = dx !== 0 || dy !== 0;
     if (moving) {
-      // dbg-walk-2: walk cycle is back; player uses the singular
-      // (own-texture) sprite, strip top row.
+      // dbg-walk-3: walk cycle via the slice-loaded sprite (the same
+      // quad path the working map tilesets use).
       walkTimer += dt;
       playerObj.frame =
-        WALK_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
+        SLICE_WALK[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
     } else {
       walkTimer = 0;
       playerObj.frame = STATIC_FRAME[facing];
