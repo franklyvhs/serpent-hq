@@ -25,6 +25,7 @@ interface Contract {
 // ---------- DOM ----------
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const promptEl = document.getElementById("prompt")!;
+document.title = "SERPENT HQ - dbg-walk-1";
 const modal = document.getElementById("console-modal")!;
 const listEl = document.getElementById("contract-list")!;
 const detailEl = document.getElementById("contract-detail")!;
@@ -205,6 +206,17 @@ async function buildWorld() {
     ]);
   }
 
+  // DEBUG strip (dbg-walk-1): screen-space row of frames, fixed = ignores
+  // camera. 0-3 static, 4/10/27 idle band, 28/34/40/46/51 walk band.
+  const testFrames = [0, 1, 2, 3, 4, 10, 27, 28, 34, 40, 46, 51];
+  for (let i = 0; i < testFrames.length; i++) {
+    k.add([
+      k.fixed(),
+      k.pos(16 + i * 20, 60),
+      k.sprite("player", { frame: testFrames[i] }),
+    ]);
+  }
+
   k.onUpdate(() => {
     if (!overlaysDown()) return;
     const dt = k.dt();
@@ -222,11 +234,10 @@ async function buildWorld() {
     else if (dy < 0) facing = "up";
     const moving = dx !== 0 || dy !== 0;
     if (moving) {
-      // Manual frame stepping: draw() renders whatever this.frame points at
-      // (the same path as the static pose), avoiding the anim player.
+      // DEBUG (dbg-walk-1): keep the static pose while moving, to test
+      // whether invisibility comes from the walk frames or from movement.
       walkTimer += dt;
-      playerObj.frame =
-        WALK_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
+      playerObj.frame = STATIC_FRAME[facing];
     } else {
       walkTimer = 0;
       playerObj.frame = STATIC_FRAME[facing];
