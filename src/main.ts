@@ -1,15 +1,13 @@
 // ============================================================
-// SERPENT HQ — v0.3 (a Hacktoria game)
-// M3a: KAPLAY engine renders the world (world data in world.ts);
+// SERPENT HQ — v0.4 (a Hacktoria game)
+// M3b: world comes from a Tiled JSON map (public/assets/maps/),
+// rendered by KAPLAY at 16px tiles, CSS-scaled 2x.
 // DOM still owns the console modal, auth and HUD.
 // ============================================================
 
 import kaplay from "kaplay";
 import { createClient } from "@supabase/supabase-js";
-import {
-  TILE, MAP_W, MAP_H, MAP, CONSOLE, SPAWN, PLAYER_SPEED,
-  EMOJI, TILE_COLOR, walkable, nearConsole, hexRGB,
-} from "./world";
+import { loadTiled, TiledWorld, Vec } from "./tiled";
 
 interface Contract {
   slug: string;
@@ -43,10 +41,12 @@ const codenameFeedback = document.getElementById("codename-feedback") as HTMLEle
 const logoutBtn = document.getElementById("logout-btn") as HTMLElement;
 const tabs = Array.from(document.querySelectorAll("#console-tabs .tab")) as HTMLElement[];
 
-// ---------- kaplay world ----------
+// ---------- kaplay ----------
+// Logical resolution 320x224 (20x14 tiles of 16px); the canvas is
+// CSS-scaled to 640x448 in index.html for a crisp 2x pixel look.
 const k = kaplay({
-  width: 640,
-  height: 448,
+  width: 320,
+  height: 224,
   canvas,
   background: [5, 8, 15],
   crisp: true,
@@ -54,37 +54,64 @@ const k = kaplay({
   debug: false,
 });
 
-// Static level: one colored rect per tile (+ emoji decoration on top).
-for (let y = 0; y < MAP_H; y++) {
-  for (let x = 0; x < MAP_W; x++) {
-    const ch = MAP[y][x] ?? ".";
-    const [r, g, b] = hexRGB(TILE_COLOR[ch] ?? TILE_COLOR["."]);
-    k.add([k.pos(x * TILE, y * TILE), k.rect(TILE, TILE), k.color(r, g, b)]);
-    if (EMOJI[ch]) {
-      const deco = k.add([
-        k.pos(x * TILE + TILE / 2, y * TILE + TILE / 2),
-        k.text(EMOJI[ch], { size: 16 }),
-        k.anchor("center"),
-        k.color(120, 140, 160),
-      ]);
-      if (ch === "#") deco.color = k.rgb(34, 211, 238);
-    }
-  }
+const PLAYER_SPEED = 80; // px per second (16px tiles)
+const INTERACT_RANGE = 22; // px
+
+let world: TiledWorld;
+const player = { x: 0, y: 0 }; // px
+let playerObj: any;
+let consolePos: Vec = { x: 0, y: 0 };
+
+function solidAt(px: number, py: number): boolean {
+  if (!world) return true;
+  const tx = Math.floor(px / world.tile);
+  const ty = Math.floor(py / world.tile);
+  if (tx < 0 || ty < 0 || tx >= world.mapW || ty >= world.mapH) return true;
+  return world.solid[ty * world.mapW + tx] === 1;
 }
 
-// Contract console hotspot (drawn once, above tiles)
-k.add([
-  k.pos(CONSOLE.x * TILE + TILE / 2, CONSOLE.y * TILE + TILE / 2),
-  k.text("\u{1F5A5}\uFE0F", { size: 16 }),
-  k.anchor("center"),
-]);
+function nearInteract(p: Vec): boolean {
+  return Math.abs(player.x - p.x) <= INTERACT_RANGE && Math.abs(player.y - p.y) <= INTERACT_RANGE;
+}
 
-// Player (placeholder agent glyph; gets a sprite sheet in M3)
-const playerObj = k.add([
-  k.pos(SPAWN.x * TILE, SPAWN.y * TILE),
-  k.text("\u{1F575}\uFE0F", { size: 20 }),
-  k.anchor("center"),
-]);
+async function buildWorld() {
+  world = await loadTiled(k, "/assets/maps/hq.json");
+  player.x = world.spawn.x;
+  player.y = world.spawn.y;
+  const c = world.objects.find((o) => o.name === "contract-console");
+  if (c) consolePos = { x: c.x, y: c.y };
+
+  // Player placeholder glyph until limezu character sprites land
+  playerObj = k.add([
+    k.pos(player.x, player.y),
+    k.text("\u{1F575}\uFE0F", { size: 12 }),
+    k.anchor("center"),
+  ]);
+
+  // Interactive highlight on the console hotspot
+  k.add([
+    k.pos(consolePos.x, consolePos.y),
+    k.circle(6),
+    k.color(34, 211, 238),
+    k.opacity(0.35),
+    k.anchor("center"),
+  ]);
+
+  k.onUpdate(() => {
+    if (!overlaysDown()) return;
+    const dt = k.dt();
+    const dx = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
+    const dy = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
+    const nx = player.x + dx * PLAYER_SPEED * dt;
+    const ny = player.y + dy * PLAYER_SPEED * dt;
+    if (dx && !solidAt(nx, player.y)) player.x = nx;
+    if (dy && !solidAt(player.x, ny)) player.y = ny;
+    playerObj.pos.x = player.x;
+    playerObj.pos.y = player.y;
+    k.camPos(k.vec2(player.x, player.y));
+    promptEl.classList.toggle("hidden", !nearInteract(consolePos));
+  });
+}
 
 // ---------- state ----------
 const keys: Record<string, boolean> = {};
@@ -93,33 +120,16 @@ window.addEventListener("keydown", (e) => {
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k2)) e.preventDefault();
   if (e.target instanceof HTMLInputElement) return; // typing in a field
   keys[k2] = true;
-  if (k2 === "e" && overlaysDown() && nearConsole(player.x, player.y)) openConsole();
+  if (k2 === "e" && overlaysDown() && nearInteract(consolePos)) openConsole();
 });
 window.addEventListener("keyup", (e) => {
   if (e.target instanceof HTMLInputElement) return;
   keys[e.key.toLowerCase()] = false;
 });
 
-// Movement runs in KAPLAY's update loop instead of requestAnimationFrame.
-const player = { x: SPAWN.x, y: SPAWN.y }; // tile units
-
 function overlaysDown(): boolean {
   return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden");
 }
-
-k.onUpdate(() => {
-  if (!overlaysDown()) return;
-  const dt = k.dt();
-  const dx = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
-  const dy = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
-  const nx = player.x + dx * PLAYER_SPEED * dt;
-  const ny = player.y + dy * PLAYER_SPEED * dt;
-  if (dx && walkable(nx, player.y)) player.x = nx;
-  if (dy && walkable(player.x, ny)) player.y = ny;
-  playerObj.pos.x = player.x * TILE;
-  playerObj.pos.y = player.y * TILE;
-  promptEl.classList.toggle("hidden", !nearConsole(player.x, player.y));
-});
 
 let contracts: Contract[] = [];
 const devAnswers: Record<string, string> = {};
@@ -391,6 +401,12 @@ async function loadDevAnswers() {
 // ---------- boot ----------
 scoreEl.textContent = "0 pts";
 agentEl.textContent = "Agent K";
-loadContracts()
+buildWorld()
+  .then(() => loadContracts())
   .then(loadDevAnswers)
-  .then(initAuth);
+  .then(initAuth)
+  .catch((err) => {
+    console.error(err);
+    promptEl.textContent = "World failed to load: " + err.message;
+    promptEl.classList.remove("hidden");
+  });

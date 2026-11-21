@@ -1,0 +1,137 @@
+// ============================================================
+// SERPENT HQ — minimal Tiled (JSON) map loader
+// Maps are authored in Tiled and exported as .json.
+// Conventions:
+//   - tile layers render bottom to top in file order (skip
+//     invisible layers; a layer named "Collision" is NOT
+//     rendered, its tiles only mark solid cells)
+//   - an object layer named "Objects" holds named point
+//     objects: "player-spawn", "contract-console", future
+//     interactables get their own names here
+// ============================================================
+
+export interface Vec {
+  x: number;
+  y: number;
+}
+
+export interface Interactable {
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface TiledWorld {
+  tile: number;              // tile size in px (16)
+  mapW: number;              // map width in tiles
+  mapH: number;              // map height in tiles
+  solid: Uint8Array;         // 1 = solid, length mapW*mapH, row-major
+  spawn: Vec;                // px
+  objects: Interactable[];   // named objects from "Objects" layer (px)
+}
+
+interface TiledTileset {
+  firstgid: number;
+  name: string;
+  image: string;
+  columns: number;
+  tilecount: number;
+  tilewidth: number;
+  tileheight: number;
+}
+
+interface TiledLayer {
+  name: string;
+  type: "tilelayer" | "objectgroup" | string;
+  visible: boolean;
+  width?: number;
+  height?: number;
+  data?: number[];
+  objects?: { name: string; type: string; x: number; y: number; width: number; height: number }[];
+}
+
+// k is the KAPLAY context (typed loosely on purpose: this module
+// should not depend on kaplay's full type surface).
+export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
+  const res = await fetch(mapUrl);
+  if (!res.ok) throw new Error("Map not found: " + mapUrl + " (HTTP " + res.status + ")");
+  const map = await res.json();
+
+  const tile: number = map.tilewidth;
+  if (tile !== map.tileheight) throw new Error("Non-square tiles not supported");
+
+  const mapW: number = map.width;
+  const mapH: number = map.height;
+  const layers: TiledLayer[] = map.layers ?? [];
+  const tilesets: TiledTileset[] = map.tilesets ?? [];
+
+  // Resolve tileset image paths against the map URL (handles "../").
+  const mapPath = new URL(mapUrl, location.origin);
+  const loaded: { ts: TiledTileset; name: string }[] = [];
+  for (const ts of tilesets) {
+    // "data:" images (small placeholder tilesets) pass through as-is;
+    // everything else resolves relative to the map URL (handles "../").
+    const imgPath = ts.image.startsWith("data:")
+      ? ts.image
+      : new URL(ts.image, mapPath).pathname;
+    await k.loadSprite(ts.name, imgPath, {
+      sliceX: ts.columns,
+      sliceY: Math.ceil(ts.tilecount / ts.columns),
+    });
+    loaded.push({ ts, name: ts.name });
+  }
+
+  const gidToSprite = (gid: number): { name: string; frame: number } | null => {
+    if (gid <= 0) return null;
+    for (let i = loaded.length - 1; i >= 0; i--) {
+      if (gid >= loaded[i].ts.firstgid) {
+        return { name: loaded[i].name, frame: gid - loaded[i].ts.firstgid };
+      }
+    }
+    return null;
+  };
+
+  const solid = new Uint8Array(mapW * mapH);
+  const objects: Interactable[] = [];
+
+  for (const layer of layers) {
+    if (layer.type === "tilelayer" && layer.data) {
+      if (layer.name === "Collision") {
+        for (let i = 0; i < layer.data.length && i < solid.length; i++) {
+          if (layer.data[i] > 0) solid[i] = 1;
+        }
+        continue; // collision layer is never rendered
+      }
+      if (!layer.visible) continue;
+      for (let y = 0; y < mapH; y++) {
+        for (let x = 0; x < mapW; x++) {
+          const gid = layer.data[y * mapW + x] ?? 0;
+          const s = gidToSprite(gid);
+          if (!s) continue;
+          k.add([
+            k.pos(x * tile, y * tile),
+            k.sprite(s.name, { frame: s.frame }),
+          ]);
+        }
+      }
+    } else if (layer.type === "objectgroup" && layer.objects) {
+      for (const o of layer.objects) {
+        objects.push({ name: o.name, x: o.x, y: o.y, width: o.width || 0, height: o.height || 0 });
+      }
+    }
+  }
+
+  const spawnObj = objects.find((o) => o.name === "player-spawn");
+  if (!spawnObj) throw new Error("Map missing 'player-spawn' object");
+
+  return {
+    tile,
+    mapW,
+    mapH,
+    solid,
+    spawn: { x: spawnObj.x, y: spawnObj.y },
+    objects,
+  };
+}
