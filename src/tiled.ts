@@ -114,13 +114,34 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
       if (!layer.visible) continue;
       for (let y = 0; y < mapH; y++) {
         for (let x = 0; x < mapW; x++) {
-          const gid = layer.data[y * mapW + x] ?? 0;
+          // Tiled packs flip/rotate flags into the top 3 bits of
+          // every gid (0x80000000=H, 0x40000000=V, 0x20000000=diag).
+          // Strip them before resolving the sprite and re-create the
+          // transform as kaplay scale/rotate on a centered tile, so
+          // rotated corner pieces and flipped walls render correctly.
+          const raw = layer.data[y * mapW + x] ?? 0;
+          const fh = (raw & 0x80000000) !== 0;
+          const fv = (raw & 0x40000000) !== 0;
+          const fd = (raw & 0x20000000) !== 0;
+          const gid = raw & 0x1fffffff;
           const s = gidToSprite(gid);
           if (!s) continue;
-          k.add([
-            k.pos(x * tile, y * tile),
+          const flags = (fh ? 1 : 0) | (fv ? 2 : 0) | (fd ? 4 : 0);
+          const comps: any[] = [
+            k.pos(x * tile + tile / 2, y * tile + tile / 2),
+            k.anchor("center"),
             k.sprite(s.name, { frame: s.frame }),
-          ]);
+          ];
+          switch (flags) {
+            case 1: comps.push(k.scale(-1, 1)); break;               // H
+            case 2: comps.push(k.scale(1, -1)); break;               // V
+            case 3: comps.push(k.scale(-1, -1)); break;             // H|V
+            case 4: comps.push(k.rotate(90), k.scale(1, -1)); break; // D (transpose)
+            case 5: comps.push(k.rotate(90)); break;                // D|H
+            case 6: comps.push(k.rotate(270)); break;              // D|V
+            case 7: comps.push(k.rotate(90), k.scale(-1, 1)); break; // D|H|V
+          }
+          k.add(comps);
         }
       }
     } else if (layer.type === "objectgroup" && layer.objects) {
