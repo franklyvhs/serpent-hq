@@ -63,19 +63,22 @@ const INTERACT_RANGE = 22; // px
 let world: TiledWorld;
 const player = { x: 0, y: 0 }; // px
 let playerObj: any;
+let idleObj: any;
 let consolePos: Vec = { x: 0, y: 0 }; // legacy spot ref (kept for compatibility)
 let facing: "right" | "up" | "left" | "down" = "down";
 let walkTimer = 0; // seconds, drives the manual walk animation
+let idleTimer = 0; // seconds, drives the idle sway while standing
 const range = (n: number) => Array.from({ length: n }, (_i) => _i);
-const STATIC_FRAME: Record<string, number> = { right: 0, up: 1, left: 2, down: 3 };
-const WALK_FPS = 10; // animation speed, frames per second (6-frame walk cycles)
-// Slice-loaded variant (56 cols x 20 rows): statics 0-3, idle row1 = 56+col,
-// walk row2 = 112+col. First frame of each 6-frame walk cycle:
-const SLICE_WALK: Record<string, number> = { right: 112, up: 118, left: 124, down: 130 };
-// Agent K's sheet has exact 32px rows, so the walk window (sheet
-// y64-95, reflection art starts at y96) never touches the baked-in
-// LimeZu reflection strip. Full quad everywhere, no clipping. (The
-// 32.8px-row premade sheet needed a 2.4px bottom clip while walking.)
+// Agent K uses one small sheet per animation (idle/walk, 24 columns:
+// six frames per direction, order right/up/left/down). Frame 0 of each
+// direction in the idle sheet doubles as the standing pose.
+const ANIM_FRAME: Record<string, number> = { right: 0, up: 6, left: 12, down: 18 };
+const WALK_FPS = 10; // walk animation, frames per second
+const IDLE_FPS = 4;  // idle sway, frames per second
+// Lesson learned the hard way: the LimeZu Character Generator's
+// whole-set export writes scrambled pixel fragments (verified by pixel
+// analysis); single-animation exports are clean. Keep one file per
+// animation and pixel-check sheets before they ship.
 
 // ---------- generic interactables ----------
 // Any named point object in the map's "Objects" layer can become an
@@ -174,23 +177,34 @@ async function buildWorld() {
   if (c) consolePos = { x: c.x, y: c.y };
   fitCamera();
 
-  // Agent K full character set, generated with the LimeZu Character
-  // Generator (896x640): 56 cols x 20 rows of exact 32px character
-  // frames. Exact rows matter: the baked-in LimeZu reflection strip
-  // under the up/left walk frames (sheet rows 96-98) sits outside the
-  // 32px walk window, so no quad/height clip is needed.
-  // Loaded with kaplay's slice generator (the same path the map
-  // tilesets use) — a custom `frames` quad array rendered blank for
-  // every frame outside the sheet's top-left 64x64 px, root cause unknown.
+  // Agent K, generated with the LimeZu Character Generator as one
+  // PNG per animation (reliable; the whole-set export was scrambled).
+  // Both sheets are 384x32: 24 frames = 6 frames per direction,
+  // order right/up/left/down (same slice loader as the map tilesets;
+  // a custom `frames` quad array renders blank outside the sheet's
+  // top-left 64x64 px, root cause unknown - keep using slices).
   await k.loadSprite(
-    "player-slice",
-    "/assets/characters/serpent_agent_k.png",
-    { sliceX: 56, sliceY: 20 },
+    "ak-walk",
+    "/assets/characters/serpent_agent_k_walk.png",
+    { sliceX: 24, sliceY: 1 },
+  );
+  await k.loadSprite(
+    "ak-idle",
+    "/assets/characters/serpent_agent_k_idle.png",
+    { sliceX: 24, sliceY: 1 },
   );
 
+  // The walk-cycle renderer; hidden while standing (idleObj shows then).
   playerObj = k.add([
     k.pos(player.x, player.y),
-    k.sprite("player-slice", { frame: STATIC_FRAME.down }),
+    k.sprite("ak-walk", { frame: ANIM_FRAME.down }),
+    k.anchor("bot"),
+    { hidden: true },
+  ]);
+  // Standing/idle renderer; visible while not moving.
+  idleObj = k.add([
+    k.pos(player.x, player.y),
+    k.sprite("ak-idle", { frame: ANIM_FRAME.down }),
     k.anchor("bot"),
   ]);
 
@@ -218,20 +232,29 @@ async function buildWorld() {
     if (dy && !solidAt(player.x, ny)) player.y = ny;
     playerObj.pos.x = player.x;
     playerObj.pos.y = player.y;
+    idleObj.pos.x = player.x;
+    idleObj.pos.y = player.y;
     if (dx > 0) facing = "right";
     else if (dx < 0) facing = "left";
     else if (dy > 0) facing = "down";
     else if (dy < 0) facing = "up";
     const moving = dx !== 0 || dy !== 0;
     if (moving) {
-      // Six-frame walk cycle per direction, stepped manually
-      // (player.frame is the same draw path as the static pose).
+      // Six-frame walk cycle per direction, stepped manually.
+      idleObj.hidden = true;
+      playerObj.hidden = false;
       walkTimer += dt;
+      idleTimer = 0;
       playerObj.frame =
-        SLICE_WALK[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
+        ANIM_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
     } else {
+      // Standing: gentle idle sway; frame 0 is the plain standing pose.
+      playerObj.hidden = true;
+      idleObj.hidden = false;
       walkTimer = 0;
-      playerObj.frame = STATIC_FRAME[facing];
+      idleTimer += dt;
+      idleObj.frame =
+        ANIM_FRAME[facing] + (Math.floor(idleTimer * IDLE_FPS) % 6);
     }
     updateCamera();
     if (toastActive) {
