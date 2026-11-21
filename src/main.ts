@@ -1,7 +1,9 @@
 // ============================================================
-// SERPENT HQ — v0.4 (a Hacktoria game)
+// SERPENT HQ — v0.5 (a Hacktoria game)
+// Fullscreen cover-crop presentation: the canvas fills the browser,
+// integer camera zoom, camera snaps at map edges (no black bars).
 // M3b: world comes from a Tiled JSON map (public/assets/maps/),
-// rendered by KAPLAY at 16px tiles, CSS-scaled 2x.
+// rendered by KAPLAY at 16px tiles, fullscreen cover-crop.
 // DOM still owns the console modal, auth and HUD.
 // ============================================================
 
@@ -42,16 +44,17 @@ const logoutBtn = document.getElementById("logout-btn") as HTMLElement;
 const tabs = Array.from(document.querySelectorAll("#console-tabs .tab")) as HTMLElement[];
 
 // ---------- kaplay ----------
-// Logical resolution 320x224 (20x14 tiles of 16px); the canvas is
-// CSS-scaled to 640x448 in index.html for a crisp 2x pixel look.
+// The canvas fills the browser window (see index.html); cover-crop
+// camera below keeps the map covering the whole screen.
 const k = kaplay({
-  width: 320,
-  height: 224,
+  // No fixed width/height: the canvas fills the browser window and
+  // KAPLAY keeps the render resolution in sync on resize (onResize).
   canvas,
   background: [5, 8, 15],
   crisp: true,
   global: false,
   debug: false,
+  pixelDensity: window.devicePixelRatio || 1,
 });
 
 const PLAYER_SPEED = 80; // px per second (16px tiles)
@@ -61,6 +64,48 @@ let world: TiledWorld;
 const player = { x: 0, y: 0 }; // px
 let playerObj: any;
 let consolePos: Vec = { x: 0, y: 0 };
+
+// ---------- camera: fullscreen cover-crop with edge snap ----------
+// The camera zoom is an integer (world px -> screen px) so pixels stay
+// crisp at any window size, and big enough that the map always covers
+// the whole viewport (cover-crop: no black bars anywhere).
+let camZoom = 1;
+
+function fitCamera() {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let z = Math.max(1, Math.floor(Math.min(vw / 320, vh / 224)));
+  if (world) {
+    const mapPxW = world.mapW * world.tile;
+    const mapPxH = world.mapH * world.tile;
+    // zoom up so the full screen is still covered by the map
+    z = Math.max(z, Math.ceil(vw / mapPxW), Math.ceil(vh / mapPxH));
+  }
+  if (z !== camZoom) {
+    camZoom = z;
+    k.camScale(camZoom);
+  }
+}
+
+function updateCamera() {
+  if (!world) return;
+  const viewW = k.width() / camZoom;
+  const viewH = k.height() / camZoom;
+  const mapPxW = world.mapW * world.tile;
+  const mapPxH = world.mapH * world.tile;
+  // follow the player, but never show beyond the map (snap to edges);
+  // if the view can show the whole map axis, just center it.
+  let cx = viewW >= mapPxW ? mapPxW / 2
+    : Math.min(Math.max(player.x, viewW / 2), mapPxW - viewW / 2);
+  let cy = viewH >= mapPxH ? mapPxH / 2
+    : Math.min(Math.max(player.y, viewH / 2), mapPxH - viewH / 2);
+  // round to the world-pixel grid so there is no shimmer while walking
+  cx = Math.round(cx * camZoom) / camZoom;
+  cy = Math.round(cy * camZoom) / camZoom;
+  k.camPos(cx, cy);
+}
+
+k.onResize(() => fitCamera());
 
 function solidAt(px: number, py: number): boolean {
   if (!world) return true;
@@ -80,6 +125,7 @@ async function buildWorld() {
   player.y = world.spawn.y;
   const c = world.objects.find((o) => o.name === "contract-console");
   if (c) consolePos = { x: c.x, y: c.y };
+  fitCamera();
 
   // Player placeholder glyph until limezu character sprites land
   playerObj = k.add([
@@ -108,7 +154,7 @@ async function buildWorld() {
     if (dy && !solidAt(player.x, ny)) player.y = ny;
     playerObj.pos.x = player.x;
     playerObj.pos.y = player.y;
-    k.camPos(k.vec2(player.x, player.y));
+    updateCamera();
     promptEl.classList.toggle("hidden", !nearInteract(consolePos));
   });
 }

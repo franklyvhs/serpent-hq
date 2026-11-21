@@ -16,27 +16,16 @@ html, body {
   height: 100%;
 }
 body {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  overflow: hidden;
 }
 #game-wrap {
-  position: relative;
-  width: 640px;
-  height: 448px;
-  border: 2px solid var(--neon-dim);
-  border-radius: 8px;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
-  box-shadow: 0 0 40px rgba(34, 211, 238, 0.15), inset 0 0 60px rgba(0,0,0,0.5);
 }
 #game { display: block; image-rendering: pixelated; }
-#center-dot {
-  position: absolute;
-  top: 224px; left: 320px;
-  width: 2px; height: 2px;
-  pointer-events: none;
-}
 #prompt {
   position: absolute;
   bottom: 60px;
