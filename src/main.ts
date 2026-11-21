@@ -65,8 +65,12 @@ const player = { x: 0, y: 0 }; // px
 let playerObj: any;
 let consolePos: Vec = { x: 0, y: 0 }; // legacy spot ref (kept for compatibility)
 let facing: "right" | "up" | "left" | "down" = "down";
+let walkTimer = 0; // seconds, drives the manual walk animation
 const range = (n: number) => Array.from({ length: n }, (_i) => _i);
 const STATIC_FRAME: Record<string, number> = { right: 0, up: 1, left: 2, down: 3 };
+// Walk band (sheet band row 2) frame ranges per direction, first frame of 6.
+const WALK_FRAME: Record<string, number> = { right: 28, up: 34, left: 40, down: 46 };
+const WALK_FPS = 10; // animation speed, frames per second
 
 // ---------- generic interactables ----------
 // Any named point object in the map's "Objects" layer can become an
@@ -179,15 +183,7 @@ async function buildWorld() {
   await k.loadSprite(
     "player",
     "/assets/limezu/moderninteriors-win/2_Characters/Character_Generator/0_Premade_Characters/16x16/Premade_Character_01.png",
-    {
-      frames,
-      anims: {
-        "walk-right": { frames: [28, 29, 30, 31, 32, 33], speed: 10, loop: true },
-        "walk-up": { frames: [34, 35, 36, 37, 38, 39], speed: 10, loop: true },
-        "walk-left": { frames: [40, 41, 42, 43, 44, 45], speed: 10, loop: true },
-        "walk-down": { frames: [46, 47, 48, 49, 50, 51], speed: 10, loop: true },
-      },
-    },
+    { frames },
   );
 
   playerObj = k.add([
@@ -226,11 +222,13 @@ async function buildWorld() {
     else if (dy < 0) facing = "up";
     const moving = dx !== 0 || dy !== 0;
     if (moving) {
-      const anim = "walk-" + facing;
-      const cur = playerObj.getCurAnim();
-      if (!cur || cur.name !== anim) playerObj.play(anim);
+      // Manual frame stepping: draw() renders whatever this.frame points at
+      // (the same path as the static pose), avoiding the anim player.
+      walkTimer += dt;
+      playerObj.frame =
+        WALK_FRAME[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
     } else {
-      if (playerObj.getCurAnim()) playerObj.stop();
+      walkTimer = 0;
       playerObj.frame = STATIC_FRAME[facing];
     }
     updateCamera();
