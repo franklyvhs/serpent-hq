@@ -72,6 +72,14 @@ const WALK_FPS = 10; // animation speed, frames per second (6-frame walk cycles)
 // Slice-loaded variant (56 cols x 20 rows): statics 0-3, idle row1 = 56+col,
 // walk row2 = 112+col. First frame of each 6-frame walk cycle:
 const SLICE_WALK: Record<string, number> = { right: 112, up: 118, left: 124, down: 130 };
+// The LimeZu sheet bakes reflection art into the rows below the walk
+// band. The 32.8px slice walk window (sheet y65.6..98.4) reaches into
+// that strip on two frames (up step 2, left step 0), showing stray
+pixels under the character. Clip the window at y96 while walking.
+const SPRITE_ROW_H = 32.8;   // 656 / 20 slice rows
+const WALK_WIN_H = 30.4;    // 96 - 65.6
+const FULL_QUAD = k.quad(0, 0, 1, 1);
+const WALK_QUAD = k.quad(0, 0, 1, WALK_WIN_H / SPRITE_ROW_H);
 
 // ---------- generic interactables ----------
 // Any named point object in the map's "Objects" layer can become an
@@ -222,9 +230,13 @@ async function buildWorld() {
       walkTimer += dt;
       playerObj.frame =
         SLICE_WALK[facing] + (Math.floor(walkTimer * WALK_FPS) % 6);
+      playerObj.quad = WALK_QUAD; // clip reflection strip at the bottom
+      playerObj.height = WALK_WIN_H;
     } else {
       walkTimer = 0;
       playerObj.frame = STATIC_FRAME[facing];
+      playerObj.quad = FULL_QUAD;
+      playerObj.height = SPRITE_ROW_H;
     }
     updateCamera();
     if (toastActive) {
