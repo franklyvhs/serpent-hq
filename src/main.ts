@@ -1,34 +1,15 @@
 // ============================================================
-// SERPENT HQ — v0.2 (a Hacktoria game)
-// Custom canvas renderer; Kaplay + Tiled replace this in M3.
+// SERPENT HQ — v0.3 (a Hacktoria game)
+// M3a: KAPLAY engine renders the world (world data in world.ts);
+// DOM still owns the console modal, auth and HUD.
 // ============================================================
 
+import kaplay from "kaplay";
 import { createClient } from "@supabase/supabase-js";
-
-const TILE = 32;
-const MAP_W = 20;
-const MAP_H = 14;
-
-// Legend: # wall  . floor  c carpet  B briefing table  s server rack  a alien flora
-const MAP = [
-  "####################",
-  "#..................#",
-  "#.........s....s...#",
-  "#..................#",
-  "#....BBBBB.....#..s#",
-  "#....BBBBB.....#...#",
-  "#....BBBBB.....s...#",
-  "#..................#",
-  "#..................#",
-  "#.......c......s...#",
-  "#......cccc........#",
-  "#......cccc....a...#",
-  "#..........a.......#",
-  "####################",
-];
-
-// Central contract console (interactive hotspot)
-const CONSOLE = { x: 8, y: 8 };
+import {
+  TILE, MAP_W, MAP_H, MAP, CONSOLE, SPAWN, PLAYER_SPEED,
+  EMOJI, TILE_COLOR, walkable, nearConsole, hexRGB,
+} from "./world";
 
 interface Contract {
   slug: string;
@@ -43,7 +24,6 @@ interface Contract {
 
 // ---------- DOM ----------
 const canvas = document.getElementById("game") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d")!;
 const promptEl = document.getElementById("prompt")!;
 const modal = document.getElementById("console-modal")!;
 const listEl = document.getElementById("contract-list")!;
@@ -63,21 +43,83 @@ const codenameFeedback = document.getElementById("codename-feedback") as HTMLEle
 const logoutBtn = document.getElementById("logout-btn") as HTMLElement;
 const tabs = Array.from(document.querySelectorAll("#console-tabs .tab")) as HTMLElement[];
 
+// ---------- kaplay world ----------
+const k = kaplay({
+  width: 640,
+  height: 448,
+  canvas,
+  background: [5, 8, 15],
+  crisp: true,
+  global: false,
+  debug: false,
+});
+
+// Static level: one colored rect per tile (+ emoji decoration on top).
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    const ch = MAP[y][x] ?? ".";
+    const [r, g, b] = hexRGB(TILE_COLOR[ch] ?? TILE_COLOR["."]);
+    k.add([k.pos(x * TILE, y * TILE), k.rect(TILE, TILE), k.color(r, g, b)]);
+    if (EMOJI[ch]) {
+      const deco = k.add([
+        k.pos(x * TILE + TILE / 2, y * TILE + TILE / 2),
+        k.text(EMOJI[ch], { size: 16 }),
+        k.anchor("center"),
+        k.color(120, 140, 160),
+      ]);
+      if (ch === "#") deco.color = k.rgb(34, 211, 238);
+    }
+  }
+}
+
+// Contract console hotspot (drawn once, above tiles)
+k.add([
+  k.pos(CONSOLE.x * TILE + TILE / 2, CONSOLE.y * TILE + TILE / 2),
+  k.text("\u{1F5A5}\uFE0F", { size: 16 }),
+  k.anchor("center"),
+]);
+
+// Player (placeholder agent glyph; gets a sprite sheet in M3)
+const playerObj = k.add([
+  k.pos(SPAWN.x * TILE, SPAWN.y * TILE),
+  k.text("\u{1F575}\uFE0F", { size: 20 }),
+  k.anchor("center"),
+]);
+
 // ---------- state ----------
 const keys: Record<string, boolean> = {};
 window.addEventListener("keydown", (e) => {
-  const k = e.key.toLowerCase();
-  if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault();
+  const k2 = e.key.toLowerCase();
+  if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k2)) e.preventDefault();
   if (e.target instanceof HTMLInputElement) return; // typing in a field
-  keys[k] = true;
-  if (k === "e" && modal.classList.contains("hidden") && nearConsole()) openConsole();
+  keys[k2] = true;
+  if (k2 === "e" && overlaysDown() && nearConsole(player.x, player.y)) openConsole();
 });
 window.addEventListener("keyup", (e) => {
   if (e.target instanceof HTMLInputElement) return;
   keys[e.key.toLowerCase()] = false;
 });
 
-const player = { x: 9.5, y: 10.5, speed: 3.2 }; // tile units, y is row
+// Movement runs in KAPLAY's update loop instead of requestAnimationFrame.
+const player = { x: SPAWN.x, y: SPAWN.y }; // tile units
+
+function overlaysDown(): boolean {
+  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden");
+}
+
+k.onUpdate(() => {
+  if (!overlaysDown()) return;
+  const dt = k.dt();
+  const dx = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
+  const dy = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
+  const nx = player.x + dx * PLAYER_SPEED * dt;
+  const ny = player.y + dy * PLAYER_SPEED * dt;
+  if (dx && walkable(nx, player.y)) player.x = nx;
+  if (dy && walkable(player.x, ny)) player.y = ny;
+  playerObj.pos.x = player.x * TILE;
+  playerObj.pos.y = player.y * TILE;
+  promptEl.classList.toggle("hidden", !nearConsole(player.x, player.y));
+});
 
 let contracts: Contract[] = [];
 const devAnswers: Record<string, string> = {};
@@ -178,71 +220,6 @@ logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
   modal.classList.add("hidden");
 });
-
-// ---------- map / movement ----------
-function walkable(x: number, y: number): boolean {
-  const tx = Math.floor(x), ty = Math.floor(y);
-  if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return false;
-  const ch = MAP[ty][tx];
-  if (tx === CONSOLE.x && ty === CONSOLE.y) return false; // console is solid
-  return ch === "." || ch === "c";
-}
-
-function nearConsole(): boolean {
-  return Math.abs(player.x - (CONSOLE.x + 0.5)) <= 1.3 && Math.abs(player.y - (CONSOLE.y + 0.5)) <= 1.3;
-}
-
-// ---------- rendering ----------
-function tileColor(ch: string): string {
-  switch (ch) {
-    case "#": return "#1e293b";
-    case "c": return "#3b1145";
-    case "B": return "#475569";
-    case "s": return "#0f172a";
-    case "a": return "#14532d";
-    default: return "#0b1626";
-  }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let y = 0; y < MAP_H; y++) {
-    const row = MAP[y];
-    for (let x = 0; x < MAP_W; x++) {
-      const ch = row[x] ?? ".";
-      ctx.fillStyle = tileColor(ch);
-      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-      ctx.font = "16px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      if (ch === "B") ctx.fillText("🖥️", x * TILE + 16, y * TILE + 16);
-      if (ch === "s") ctx.fillText("🗄️", x * TILE + 16, y * TILE + 16);
-      if (ch === "a") ctx.fillText("🛸", x * TILE + 16, y * TILE + 16);
-      if (ch === "#") { ctx.fillStyle = "rgba(34,211,238,0.15)"; ctx.fillText("▓", x * TILE + 16, y * TILE + 16); }
-    }
-  }
-  ctx.font = "18px sans-serif";
-  ctx.fillText("🖥️", CONSOLE.x * TILE + 16, CONSOLE.y * TILE + 16);
-  ctx.font = "20px sans-serif";
-  ctx.fillText("🕵️", player.x * TILE, player.y * TILE);
-}
-
-let last = performance.now();
-function update(now: number) {
-  const dt = (now - last) / 1000;
-  last = now;
-  if (modal.classList.contains("hidden") && authOverlay.classList.contains("hidden")) {
-    const dx = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
-    const dy = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
-    const nx = player.x + dx * player.speed * dt;
-    const ny = player.y + dy * player.speed * dt;
-    if (dx && walkable(nx, player.y)) player.x = nx;
-    if (dy && walkable(player.x, ny)) player.y = ny;
-    promptEl.classList.toggle("hidden", !nearConsole());
-  }
-  draw();
-  requestAnimationFrame(update);
-}
 
 // ---------- console UI ----------
 function openConsole() {
@@ -393,7 +370,7 @@ async function checkAnswer(c: Contract, answer: string): Promise<{ correct: bool
   }
 };
 
-(document.getElementById("cd-answer") as HTMLElement).addEventListener("keydown", (e) => {
+(document.getElementById("cd-answer") as HTMLInputElement).addEventListener("keydown", (e) => {
   if (e.key === "Enter") (document.getElementById("cd-submit") as HTMLElement).click();
   e.stopPropagation();
 });
@@ -416,5 +393,4 @@ scoreEl.textContent = "0 pts";
 agentEl.textContent = "Agent K";
 loadContracts()
   .then(loadDevAnswers)
-  .then(initAuth)
-  .then(() => requestAnimationFrame(update));
+  .then(initAuth);
