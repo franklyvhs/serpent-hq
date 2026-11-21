@@ -29,7 +29,7 @@ export interface TiledWorld {
   mapH: number;              // map height in tiles
   solid: Uint8Array;         // 1 = solid, length mapW*mapH, row-major
   spawn: Vec;                // px
-  objects: Interactable[];   // named objects from "Objects" layer (px)
+  objects: Interactable[];  // named objects from "Objects" layer (px)
 }
 
 interface TiledTileset {
@@ -60,8 +60,7 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
   const map = await res.json();
 
   const tile: number = map.tilewidth;
-  if (tile !== map.tileheight) throw new Error("Non-square tiles not su
-pported");
+  if (tile !== map.tileheight) throw new Error("Non-square tiles not supported");
 
   const mapW: number = map.width;
   const mapH: number = map.height;
@@ -125,8 +124,7 @@ pported");
         }
       }
     } else if (layer.type === "objectgroup" && layer.objects) {
-      for (con
-st o of layer.objects) {
+      for (const o of layer.objects) {
         objects.push({ name: o.name, x: o.x, y: o.y, width: o.width || 0, height: o.height || 0 });
       }
     }
