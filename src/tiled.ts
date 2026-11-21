@@ -60,7 +60,8 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
   const map = await res.json();
 
   const tile: number = map.tilewidth;
-  if (tile !== map.tileheight) throw new Error("Non-square tiles not supported");
+  if (tile !== map.tileheight) throw new Error("Non-square tiles not su
+pported");
 
   const mapW: number = map.width;
   const mapH: number = map.height;
@@ -98,6 +99,13 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
 
   for (const layer of layers) {
     if (layer.type === "tilelayer" && layer.data) {
+      // A short/long array renders garbage and breaks collision silently:
+      // fail loudly instead.
+      if (layer.data.length !== mapW * mapH) {
+        throw new Error(
+          `Map layer "${layer.name}" has ${layer.data.length} tiles, expected ${mapW * mapH} (${mapW}x${mapH})`
+        );
+      }
       if (layer.name === "Collision") {
         for (let i = 0; i < layer.data.length && i < solid.length; i++) {
           if (layer.data[i] > 0) solid[i] = 1;
@@ -117,7 +125,8 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         }
       }
     } else if (layer.type === "objectgroup" && layer.objects) {
-      for (const o of layer.objects) {
+      for (con
+st o of layer.objects) {
         objects.push({ name: o.name, x: o.x, y: o.y, width: o.width || 0, height: o.height || 0 });
       }
     }
