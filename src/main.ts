@@ -96,8 +96,20 @@ function toast(msg: string) {
   toastUntil = performance.now() + 3200;
 }
 
+// ---------- SERPENT OS desk computer (src/computer.js) ----------
+// The computer overlay dispatches "serpent-computer" events so the
+// game loop can pause movement while the player sits at the desk.
+let computerOpen = false;
+window.addEventListener("serpent-computer", ((e: CustomEvent) => {
+  computerOpen = !!e.detail?.open;
+  if (computerOpen) for (const kk of Object.keys(keys)) keys[kk] = false;
+}) as EventListener);
+
 const INTERACTABLES: Record<string, { label: string; action: () => void }> = {
-  "contract-console": { label: "Mission console", action: () => openConsole() },
+  "contract-console": {
+    label: "Agent K's computer",
+    action: () => (window as any).SERPENT_COMPUTER?.open(),
+  },
   "notice-board": {
     label: "HQ notice board",
     action: () => toast("The board reads: \"Trust no one. Verify everything. New contracts drop Fridays.\""),
@@ -289,7 +301,7 @@ window.addEventListener("keyup", (e) => {
 });
 
 function overlaysDown(): boolean {
-  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden");
+  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden") && !computerOpen;
 }
 
 let contracts: Contract[] = [];
@@ -571,3 +583,51 @@ buildWorld()
     promptEl.textContent = "World failed to load: " + err.message;
     promptEl.classList.remove("hidden");
   });
+
+// ---------- SERPENT OS computer bridge (src/computer.js) ----------
+// The desk computer UI talks to the game exclusively through this API.
+(window as any).SERPENT_GAME = {
+  isAuthed: () => !supabase || !!userId,
+  getContracts: () => contracts,
+  isSolved: (slug: string) => solved.has(slug),
+  submitAnswer: async (c: Contract, answer: string) => {
+    let res: { correct: boolean; error?: string };
+    try {
+      res = await checkAnswer(c, answer);
+    } catch {
+      return { correct: false, error: "Connection error. Try again." };
+    }
+    if (res.correct && !solved.has(c.slug)) {
+      solved.add(c.slug);
+      score += c.points;
+      scoreEl.textContent = score + " pts";
+    }
+    return res;
+  },
+  getLeaderboard: async () => {
+    if (!supabase) return [];
+    const { data } = await supabase
+      .from("leaderboard")
+      .select("codename, points, contracts_solved")
+      .order("points", { ascending: false })
+      .limit(50);
+    return data ?? [];
+  },
+  getCodename: () => codenameInput.value || agentEl.textContent || "Agent K",
+  saveCodename: async (name: string) => {
+    if (!supabase || !userId) return { ok: false, error: "Sign in first, Agent." };
+    const { error } = await supabase.from("profiles").update({ codename: name }).eq("id", userId);
+    if (error) {
+      return {
+        ok: false,
+        error: error.message.includes("duplicate")
+          ? "Codename taken. You are not the only agent with taste."
+          : "Rename failed: " + error.message,
+      };
+    }
+    agentEl.textContent = name;
+    codenameInput.value = name;
+    return { ok: true };
+  },
+  logout: () => logoutBtn.click(),
+};
