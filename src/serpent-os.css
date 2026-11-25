@@ -604,3 +604,87 @@ table.scores tr.me td { background: #ffffcc; }
   border-color: #000 #fff #fff #000;
   padding: 5px 13px 3px 15px !important;
 }
+
+/* ============================================================
+   IN-WORLD NOTICE BOARD (physical whiteboard, NOT SERPENT OS)
+   Own aesthetic: marker title + pinned paper notes.
+   ============================================================ */
+#whiteboard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(3, 6, 12, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+}
+.wb-board {
+  position: relative;
+  width: min(720px, 92vw);
+  max-height: 82vh;
+  overflow-y: auto;
+  background: #fbfaf5;
+  border: 10px solid #d7d3c8;
+  border-radius: 6px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 60px rgba(120, 110, 90, 0.08);
+  padding: 24px 22px 22px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-content: flex-start;
+  justify-content: center;
+}
+.wb-title {
+  width: 100%;
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  color: #1a2b6d;
+  letter-spacing: 3px;
+  border-bottom: 3px solid rgba(26, 43, 109, 0.2);
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+}
+.wb-note {
+  position: relative;
+  background: #fff;
+  width: 200px;
+  min-height: 118px;
+  padding: 14px 10px 10px;
+  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.18);
+  font-size: 13px;
+  line-height: 1.45;
+  color: #222;
+  border-radius: 2px;
+  transform: rotate(-1.4deg);
+}
+.wb-note:nth-child(even) { transform: rotate(1.2deg); }
+.wb-note:nth-child(3n) { background: #fdf3c4; }
+.wb-note:nth-child(4n) { transform: rotate(-2.2deg); }
+.wb-note .wb-pin {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  margin-left: -5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+}
+.wb-close {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #2b2b2b;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+.wb-close:hover { background: #444; }
