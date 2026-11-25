@@ -87,7 +87,7 @@
     '  <ul>' +
     '    <li data-open="cmwin">\u{1F4BC} Contract Manager</li>' +
     '    <li data-open="scorewin">\u{1F3C6} Scoreboard</li>' +
-    '    <li data-open="notewin">\u{1F4C4} README.TXT</li>' +
+    '    <li data-open="notewin">\u{1F4C4} README.TXT \u2014 how to play</li>' +
     '    <li data-open="agentwin">\u{1F511} Agent ID</li>' +
     '    <hr>' +
     '    <li id="menu-shutdown">\u{1F6D1} Shut Down (leave desk)</li>' +
@@ -163,11 +163,11 @@
     var nw = el("div", "window hidden");
     nw.id = "notewin";
     nw.innerHTML =
-      '<div class="titlebar"><span>\u{1F4C4}</span><span class="t-text">README.TXT \u2014 Notice Board</span><button class="tb-btn" data-close="notewin">\u2715</button></div>' +
+      '<div class="titlebar"><span>\u{1F4C4}</span><span class="t-text">README.TXT \u2014 How to play contracts</span><button class="tb-btn" data-close="notewin">\u2715</button></div>' +
       '<div class="win-body">' +
-      '  <div class="notepaper">NOTICE BOARD \u2014 SERPENT HQ\n\n\u00b7 Trust no one. Verify everything.\n\u00b7 New contracts drop Fridays.\n\u00b7 The server room is NOT a phone booth. Cuts both ways, Gary.\n\u00b7 Lost: one (1) rubber spoon. Answers to "Snakelor".\n\u00b7 Klumgongyn requests you stop feeding the printer.\n\n        \u2014 posted by SERPENT Command (do not reply)</div>' +
+      '  <div class="notepaper">SERPENT FIELD MANUAL\n\n1. Walk to Agent K\'s computer and press E. Sign in with your email magic link if you haven\'t \u2014 solves and score only count when signed in.\n\n2. Open the CONTRACT MANAGER and pick a contract. Each shows its discipline, difficulty and points.\n\n3. Do the work OUTSIDE the game. Contracts are real-world OSINT: public records, search engines, maps, registries. Nothing here needs hacking (we don\'t do that).\n\n4. Every contract has one short answer \u2014 a name, a number, a year, a place. Type it into SUBMIT SOLUTION and press Enter. HQ checks it instantly.\n\n5. One correct solve per contract, locked forever, points added on the spot. Attempts are rate-limited to 12 per 5 minutes \u2014 frenzy is not a strategy, Agent.\n\n6. Stuck? GET HINT reveals a nudge, but hints drop your medal: GOLD with no hints, SILVER after one, BRONZE after two, no medal after three.\n\n7. Track the agency in SCORE.EXE. Climb.\n\n        \u2014 SERPENT Command (do not reply)</div>' +
       '</div>' +
-      '<div class="statusbar"><span>README.TXT \u00b7 5 notes</span><span>do not reply</span></div>';
+      '<div class="statusbar"><span>SERPENT Field Manual \u00b7 7 steps</span><span>mandatory reading</span></div>';
 
     desk.insertBefore(nw, desk.firstChild);
     desk.insertBefore(sc, desk.firstChild);
