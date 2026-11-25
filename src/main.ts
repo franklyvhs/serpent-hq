@@ -105,6 +105,13 @@ window.addEventListener("serpent-computer", ((e: CustomEvent) => {
   if (computerOpen) for (const kk of Object.keys(keys)) keys[kk] = false;
 }) as EventListener);
 
+// The in-world whiteboard overlay pauses movement the same way.
+let whiteboardOpen = false;
+window.addEventListener("serpent-whiteboard", ((e: CustomEvent) => {
+  whiteboardOpen = !!e.detail?.open;
+  if (whiteboardOpen) for (const kk of Object.keys(keys)) keys[kk] = false;
+}) as EventListener);
+
 const INTERACTABLES: Record<string, { label: string; action: () => void }> = {
   "contract-console": {
     label: "Agent K's computer",
@@ -112,7 +119,7 @@ const INTERACTABLES: Record<string, { label: string; action: () => void }> = {
   },
   "notice-board": {
     label: "HQ notice board",
-    action: () => toast("The board reads: \"Trust no one. Verify everything. New contracts drop Fridays.\""),
+    action: () => (window as any).WHITEBOARD?.open(),
   },
   "coffee-machine": {
     label: "Coffee machine",
@@ -301,7 +308,7 @@ window.addEventListener("keyup", (e) => {
 });
 
 function overlaysDown(): boolean {
-  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden") && !computerOpen;
+  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden") && !computerOpen && !whiteboardOpen;
 }
 
 let contracts: Contract[] = [];
