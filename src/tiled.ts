@@ -5,6 +5,9 @@
 //   - tile layers render bottom to top in file order (skip
 //     invisible layers; a layer named "Collision" is NOT
 //     rendered, its tiles only mark solid cells)
+//   - a layer named "Overhead" is z-sorted against characters:
+//     put tall furniture (counters, beds, shelves) there and the
+//     player/NPCs walk behind it when north of the piece
 //   - an object layer named "Objects" holds named point
 //     objects: "player-spawn", "contract-console", future
 //     interactables get their own names here
@@ -132,6 +135,13 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             k.anchor("center"),
             k.sprite(s.name, { frame: s.frame }),
           ];
+          // Depth sorting: a layer named "Overhead" holds tall
+          // furniture the characters can walk BEHIND. Its tiles get
+          // z = the tile's bottom edge, so the renderer z-sorts them
+          // against the player/NPCs (whose z is their feet position):
+          // north of the furniture = behind it, south = in front.
+          // All other layers stay at z 0 = always under characters.
+          if (layer.name === "Overhead") comps.push(k.z((y + 1) * tile));
           switch (flags) {
             case 1: comps.push(k.scale(-1, 1)); break;               // H
             case 2: comps.push(k.scale(1, -1)); break;               // V

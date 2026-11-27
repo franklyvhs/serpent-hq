@@ -278,11 +278,13 @@ async function spawnNpcs() {
         k.pos(npc.px, npc.py),
         k.sprite("npc-" + def.id, { frame: WALK_ROW + ANIM_FRAME.down }),
         k.anchor("bot"),
+        k.z(npc.py),
       ]);
       npc.idleObj = k.add([
         k.pos(npc.px, npc.py),
         k.sprite("npc-" + def.id, { frame: IDLE_ROW + ANIM_FRAME.down }),
         k.anchor("bot"),
+        k.z(npc.py),
       ]);
       npc.walkObj.hidden = true;
     } else {
@@ -353,8 +355,8 @@ function updateNpcs(dt: number) {
       }
     }
     // render
-    if (npc.walkObj) { npc.walkObj.pos.x = npc.px; npc.walkObj.pos.y = npc.py; }
-    if (npc.idleObj) { npc.idleObj.pos.x = npc.px; npc.idleObj.pos.y = npc.py; }
+    if (npc.walkObj) { npc.walkObj.pos.x = npc.px; npc.walkObj.pos.y = npc.py; npc.walkObj.z = npc.py; }
+    if (npc.idleObj) { npc.idleObj.pos.x = npc.px; npc.idleObj.pos.y = npc.py; npc.idleObj.z = npc.py; }
     if (npc.tagObj) { npc.tagObj.pos.x = npc.px; npc.tagObj.pos.y = npc.py - 26; }
     if (npc.hasSheet && npc.idleObj && npc.walkObj) {
       const dirName = npc.fx === 1 ? "right" : npc.fx === -1 ? "left" : npc.fy === -1 ? "up" : "down";
@@ -444,6 +446,7 @@ async function buildWorld() {
     k.pos(player.x, player.y),
     k.sprite("ak", { frame: WALK_ROW + ANIM_FRAME.down }),
     k.anchor("bot"),
+    k.z(player.y), // depth: sorts against Overhead furniture tiles
   ]);
   // `hidden` is a built-in game-object property in kaplay; setting it
   // as a component value collides ("Duplicate component property"), so
@@ -454,6 +457,7 @@ async function buildWorld() {
     k.pos(player.x, player.y),
     k.sprite("ak", { frame: IDLE_ROW + ANIM_FRAME.down }),
     k.anchor("bot"),
+    k.z(player.y), // depth: sorts against Overhead furniture tiles
   ]);
 
   // The NPC cast (public/content/npcs.json + Tiled npc-<id> objects)
@@ -483,8 +487,10 @@ async function buildWorld() {
     if (dy && !solidAt(player.x, ny)) player.y = ny;
     playerObj.pos.x = player.x;
     playerObj.pos.y = player.y;
+    playerObj.z = player.y; // feet depth: behind Overhead tiles north of us
     idleObj.pos.x = player.x;
     idleObj.pos.y = player.y;
+    idleObj.z = player.y;
     if (dx > 0) facing = "right";
     else if (dx < 0) facing = "left";
     else if (dy > 0) facing = "down";
