@@ -373,6 +373,123 @@ function updateNpcs(dt: number) {
   }
 }
 
+// ---------- doors ----------
+// A door = closed art tiles on the map layer "Doors" + optional open
+// art on "DoorsOpen" (same cells) + a rectangle object "door-<id>" on
+// "Objects" covering its cells. E toggles: swap art + toggle the
+// Collision cells under the door region.
+interface Door {
+  name: string;
+  x: number; y: number; w: number; h: number; // region in px
+  cells: { tx: number; ty: number; orig: number }[]; // original solid values
+  closedTiles: { obj: any }[];
+  openTiles: { obj: any }[];
+  open: boolean;
+}
+let doors: Door[] = [];
+
+function initDoors() {
+  const doorTiles = world.tilesByLayer["Doors"] ?? [];
+  const openTiles = world.tilesByLayer["DoorsOpen"] ?? [];
+  for (const o of world.objects) {
+    if (!o.name.startsWith("door-")) continue;
+    const w = o.width > 0 ? o.width : world.tile;
+    const h = o.height > 0 ? o.height : world.tile;
+    const x0 = Math.floor(o.x / world.tile);
+    const y0 = Math.floor(o.y / world.tile);
+    const x1 = Math.ceil((o.x + w) / world.tile);
+    const y1 = Math.ceil((o.y + h) / world.tile);
+    const cells: { tx: number; ty: number; orig: number }[] = [];
+    for (let ty = y0; ty < y1; ty++) {
+      for (let tx = x0; tx < x1; tx++) {
+        if (tx < 0 || ty < 0 || tx >= world.mapW || ty >= world.mapH) continue;
+        cells.push({ tx, ty, orig: world.solid[ty * world.mapW + tx] });
+      }
+    }
+    const inRegion = (t: { tx: number; ty: number }) =>
+      cells.some((c) => c.tx === t.tx && c.ty === t.ty);
+    doors.push({
+      name: o.name,
+      x: o.x, y: o.y, w, h,
+      cells,
+      closedTiles: doorTiles.filter((t) => inRegion(t)).map((t) => ({ obj: t.obj })),
+      openTiles: openTiles.filter((t) => inRegion(t)).map((t) => ({ obj: t.obj })),
+      open: false,
+    });
+  }
+}
+
+function toggleDoor(door: Door) {
+  if (!door.open) {
+    for (const t of door.closedTiles) t.obj.hidden = true;
+    for (const t of door.openTiles) t.obj.hidden = false;
+    for (const c of door.cells) world.solid[c.ty * world.mapW + c.tx] = 0;
+    door.open = true;
+  } else {
+    // do not slam a door into the agent standing in the doorway
+    for (const c of door.cells) {
+      const cx = (c.tx + 0.5) * world.tile;
+      const cy = (c.ty + 0.5) * world.tile;
+      if (Math.abs(player.x - cx) < world.tile && Math.abs(player.y - cy) < world.tile) {
+        toast("Step away from the doorway first, Agent.");
+        return;
+      }
+    }
+    for (const t of door.closedTiles) t.obj.hidden = false;
+    for (const t of door.openTiles) t.obj.hidden = true;
+    for (const c of door.cells) world.solid[c.ty * world.mapW + c.tx] = c.orig;
+    door.open = false;
+  }
+}
+
+function nearestDoor(): { door: Door; d: number } | null {
+  let best: { door: Door; d: number } | null = null;
+  let bestD = INTERACT_RANGE;
+  for (const door of doors) {
+    // distance from the player to the door rectangle
+    const dx = Math.max(door.x - player.x, 0, player.x - (door.x + door.w));
+    const dy = Math.max(door.y - player.y, 0, player.y - (door.y + door.h));
+    const d = Math.max(dx, dy);
+    if (d <= bestD) { bestD = d; best = { door, d }; }
+  }
+  return best;
+}
+
+// ---------- animated props ----------
+// Paint the FIRST frame of an animated object on a map layer named
+// "Animated"; public/content/animations.json maps tileset+frame to a
+// loop: [{ "tileset": "<Tiled tileset name>", "frame": <first frame
+// id>, "frames": <count>, "fps": 8 }]. The game swaps the static tile
+// for a playing sprite animation.
+interface AnimCfg { tileset: string; frame: number; frames: number; fps: number; }
+interface PlayingAnim { obj: any; base: number; frames: number; fps: number; }
+let playingAnims: PlayingAnim[] = [];
+let animTimer = 0;
+
+async function initAnimatedProps() {
+  const tiles = world.tilesByLayer["Animated"] ?? [];
+  if (!tiles.length) return;
+  let cfgs: AnimCfg[] = [];
+  try {
+    const res = await fetch("/content/animations.json");
+    if (res.ok) cfgs = await res.json();
+  } catch { /* no config: tiles stay static */ }
+  for (const t of tiles) {
+    const cfg = cfgs.find((c) => c.tileset === t.name && c.frame === t.frame);
+    if (!cfg) {
+      console.warn("Animated tile without animations.json entry: " + t.name + " frame " + t.frame);
+      continue;
+    }
+    t.obj.destroy(); // remove the static tile, add the playing sprite
+    const obj = k.add([
+      k.pos(t.x, t.y),
+      k.anchor("center"),
+      k.sprite(t.name, { frame: t.frame }),
+    ]);
+    playingAnims.push({ obj, base: t.frame, frames: cfg.frames, fps: cfg.fps });
+  }
+}
+
 // ---------- camera: fullscreen cover-crop with edge snap ----------
 // The camera zoom is an integer (world px -> screen px) so pixels stay
 // crisp at any window size, and big enough that the map always covers
@@ -462,6 +579,9 @@ async function buildWorld() {
 
   // The NPC cast (public/content/npcs.json + Tiled npc-<id> objects)
   await spawnNpcs();
+  // Doors + animated props (layers "Doors"/"DoorsOpen"/"Animated")
+  initDoors();
+  await initAnimatedProps();
 
   // Hotspot markers for everything the game knows how to interact with
   for (const o of world.objects) {
@@ -514,6 +634,10 @@ async function buildWorld() {
         IDLE_ROW + ANIM_FRAME[facing] + (Math.floor(idleTimer * IDLE_FPS) % 6);
     }
     updateNpcs(dt);
+    animTimer += dt;
+    for (const a of playingAnims) {
+      a.obj.frame = a.base + (Math.floor(animTimer * a.fps) % a.frames);
+    }
     updateCamera();
     if (toastActive) {
       if (performance.now() > toastUntil) {
@@ -524,15 +648,20 @@ async function buildWorld() {
     }
     const near = nearestInteractable();
     const nearNpc = nearestNpc();
-    // prefer whichever is actually closest (talk vs use)
+    const nearDoorRes = nearestDoor();
+    // prefer whichever is actually closest (talk / use / door)
     const dSpot = near
       ? Math.max(Math.abs(player.x - near.spot.x), Math.abs(player.y - near.spot.y))
       : Infinity;
     const dNpc = nearNpc
       ? Math.max(Math.abs(player.x - nearNpc.px), Math.abs(player.y - nearNpc.py))
       : Infinity;
-    if (nearNpc && dNpc <= dSpot) {
+    const dDoor = nearDoorRes ? nearDoorRes.d : Infinity;
+    if (nearNpc && dNpc <= dSpot && dNpc <= dDoor) {
       promptEl.textContent = "[E] Talk to " + nearNpc.name;
+      promptEl.classList.remove("hidden");
+    } else if (nearDoorRes && dDoor <= dSpot) {
+      promptEl.textContent = nearDoorRes.door.open ? "[E] Close door" : "[E] Open door";
       promptEl.classList.remove("hidden");
     } else if (near) {
       promptEl.textContent = "[E] " + near.def.label;
@@ -558,13 +687,16 @@ window.addEventListener("keydown", (e) => {
   if (k2 === "e" && !e.repeat && overlaysDown()) {
     const nearNpc = nearestNpc();
     const near = nearestInteractable();
+    const nearDoorRes = nearestDoor();
     const dSpot = near
       ? Math.max(Math.abs(player.x - near.spot.x), Math.abs(player.y - near.spot.y))
       : Infinity;
     const dNpc = nearNpc
       ? Math.max(Math.abs(player.x - nearNpc.px), Math.abs(player.y - nearNpc.py))
       : Infinity;
-    if (nearNpc && dNpc <= dSpot) openDialogue(nearNpc);
+    const dDoor = nearDoorRes ? nearDoorRes.d : Infinity;
+    if (nearNpc && dNpc <= dSpot && dNpc <= dDoor) openDialogue(nearNpc);
+    else if (nearDoorRes && dDoor <= dSpot) toggleDoor(nearDoorRes.door);
     else if (near) near.def.action();
   }
 });

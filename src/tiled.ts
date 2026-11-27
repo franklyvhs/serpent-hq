@@ -11,6 +11,13 @@
 //   - an object layer named "Objects" holds named point
 //     objects: "player-spawn", "contract-console", future
 //     interactables get their own names here
+//   - DOORS: closed door art on a layer "Doors" (renders normally);
+//     optional open-door art on "DoorsOpen" (same cells, hidden until
+//     opened); a rectangle object named "door-<id>" on "Objects" marks
+//     the door region. The game toggles visibility + collision cells.
+//   - ANIMATED PROPS: paint the FIRST frame of an animated object on
+//     a layer "Animated"; main.ts swaps it for a playing loop using
+//     public/content/animations.json ({tileset, frame, frames, fps}).
 // ============================================================
 
 export interface Vec {
@@ -26,13 +33,24 @@ export interface Interactable {
   height: number;
 }
 
+export interface DoorTile {
+  x: number;   // world px (tile center)
+  y: number;
+  tx: number;  // tile coords
+  ty: number;
+  name: string; // kaplay sprite name (= Tiled tileset name)
+  frame: number; // frame inside that tileset (gid - firstgid)
+  obj: any;     // live game object (hide/destroy to swap art)
+}
+
 export interface TiledWorld {
   tile: number;              // tile size in px (16)
   mapW: number;              // map width in tiles
   mapH: number;              // map height in tiles
-  solid: Uint8Array;         // 1 = solid, length mapW*mapH, row-major
+  solid: Uint8Array;         // 1 = solid, length mapW*mapH, row-major (mutable: doors toggle it)
   spawn: Vec;                // px
   objects: Interactable[];  // named objects from "Objects" layer (px)
+  tilesByLayer: Record<string, DoorTile[]>; // "Doors" / "DoorsOpen" / "Animated" tile handles
 }
 
 interface TiledTileset {
@@ -98,6 +116,7 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
 
   const solid = new Uint8Array(mapW * mapH);
   const objects: Interactable[] = [];
+  const tilesByLayer: Record<string, DoorTile[]> = {};
 
   for (const layer of layers) {
     if (layer.type === "tilelayer" && layer.data) {
@@ -129,6 +148,9 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
           const gid = raw & 0x1fffffff;
           const s = gidToSprite(gid);
           if (!s) continue;
+          const isDoors = layer.name === "Doors";
+          const isDoorsOpen = layer.name === "DoorsOpen";
+          const isAnimated = layer.name === "Animated";
           const flags = (fh ? 1 : 0) | (fv ? 2 : 0) | (fd ? 4 : 0);
           const comps: any[] = [
             k.pos(x * tile + tile / 2, y * tile + tile / 2),
@@ -151,7 +173,16 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             case 6: comps.push(k.rotate(270)); break;              // D|V
             case 7: comps.push(k.rotate(90), k.scale(-1, 1)); break; // D|H|V
           }
-          k.add(comps);
+          const go = k.add(comps);
+          // Doors/Animated tiles keep live handles so the game can swap
+          // or animate them; DoorsOpen art stays hidden until a door opens
+          // (`.hidden` must be assigned after creation, not as a component).
+          if (isDoors || isAnimated) {
+            (tilesByLayer[layer.name] ??= []).push({ x: x * tile + tile / 2, y: y * tile + tile / 2, tx: x, ty: y, name: s.name, frame: s.frame, obj: go });
+          } else if (isDoorsOpen) {
+            go.hidden = true;
+            (tilesByLayer.DoorsOpen ??= []).push({ x: x * tile + tile / 2, y: y * tile + tile / 2, tx: x, ty: y, name: s.name, frame: s.frame, obj: go });
+          }
         }
       }
     } else if (layer.type === "objectgroup" && layer.objects) {
@@ -171,5 +202,6 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
     solid,
     spawn: { x: spawnObj.x, y: spawnObj.y },
     objects,
+    tilesByLayer,
   };
 }
