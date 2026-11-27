@@ -90,25 +90,63 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
 
   // Resolve tileset image paths against the map URL (handles "../").
   const mapPath = new URL(mapUrl, location.origin);
-  const loaded: { ts: TiledTileset; name: string }[] = [];
+  const loaded: { ts: TiledTileset; name: string; chunkRows: number; chunked: boolean }[] = [];
+  // GPU textures have a maximum size (4096 on weak/mobile GPUs, up to
+  // 16384 on desktops). Tileset images taller than that (e.g.
+  // Interiors_16x16 is 256x17024) render as SOLID BLACK in the browser,
+  // while Tiled itself shows them fine (it draws in chunks). So: split
+  // any oversized sheet into vertical chunks of <=MAX_TEX px and load
+  // each chunk as its own sprite "<name>~<chunk>".
+  const MAX_TEX = 4096;
   for (const ts of tilesets) {
     // "data:" images (small placeholder tilesets) pass through as-is;
     // everything else resolves relative to the map URL (handles "../").
     const imgPath = ts.image.startsWith("data:")
       ? ts.image
       : new URL(ts.image, mapPath).pathname;
-    await k.loadSprite(ts.name, imgPath, {
-      sliceX: ts.columns,
-      sliceY: Math.ceil(ts.tilecount / ts.columns),
+    const sliceX = ts.columns;
+    const sliceY = Math.ceil(ts.tilecount / ts.columns);
+    const sheetH = ts.tileheight * sliceY;
+    if (ts.image.startsWith("data:") || sheetH <= MAX_TEX) {
+      await k.loadSprite(ts.name, imgPath, { sliceX, sliceY });
+      loaded.push({ ts, name: ts.name, chunkRows: sliceY, chunked: false });
+      continue;
+    }
+    // oversized sheet: fetch pixels, slice into chunk sprites
+    const img = new Image();
+    img.src = imgPath;
+    await new Promise<void>((ok, err) => {
+      img.onload = () => ok();
+      img.onerror = () => err(new Error("Tileset image failed: " + imgPath));
     });
-    loaded.push({ ts, name: ts.name });
+    const chunkRows = Math.floor(MAX_TEX / ts.tileheight); // tile rows per chunk
+    const chunkPx = chunkRows * ts.tileheight;
+    const chunkCount = Math.ceil(img.height / chunkPx);
+    for (let c = 0; c < chunkCount; c++) {
+      const cy = c * chunkPx;
+      const chPx = Math.min(chunkPx, img.height - cy);
+      const cv = document.createElement("canvas");
+      cv.width = img.width;
+      cv.height = chPx;
+      cv.getContext("2d")!.drawImage(img, 0, cy, img.width, chPx, 0, 0, img.width, chPx);
+      await k.loadSprite(ts.name + "~" + c, cv.toDataURL("image/png"), {
+        sliceX,
+        sliceY: Math.ceil(chPx / ts.tileheight),
+      });
+    }
+    loaded.push({ ts, name: ts.name, chunkRows, chunked: true });
   }
 
   const gidToSprite = (gid: number): { name: string; frame: number } | null => {
     if (gid <= 0) return null;
     for (let i = loaded.length - 1; i >= 0; i--) {
-      if (gid >= loaded[i].ts.firstgid) {
-        return { name: loaded[i].name, frame: gid - loaded[i].ts.firstgid };
+      const e = loaded[i];
+      if (gid >= e.ts.firstgid) {
+        const frame = gid - e.ts.firstgid;
+        if (!e.chunked) return { name: e.name, frame };
+        const perChunk = e.ts.columns * e.chunkRows;
+        const chunk = Math.floor(frame / perChunk);
+        return { name: e.name + "~" + chunk, frame: frame - chunk * perChunk };
       }
     }
     return null;
