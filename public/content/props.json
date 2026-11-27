@@ -1,0 +1,22 @@
+[
+  {
+    "id": "coffee",
+    "sprite": "/assets/limezu/moderninteriors-win/3_Animated_objects/16x16/spritesheets/animated_coffee.png",
+    "fps": 6
+  },
+  {
+    "id": "tv",
+    "sprite": "/assets/limezu/moderninteriors-win/3_Animated_objects/16x16/spritesheets/animated_old_tv.png",
+    "fps": 5
+  },
+  {
+    "id": "server",
+    "sprite": "/assets/limezu/moderninteriors-win/3_Animated_objects/16x16/spritesheets/animated_control_room_server.png",
+    "fps": 6
+  },
+  {
+    "id": "screens",
+    "sprite": "/assets/limezu/moderninteriors-win/3_Animated_objects/16x16/spritesheets/animated_control_room_screens.png",
+    "fps": 6
+  }
+]

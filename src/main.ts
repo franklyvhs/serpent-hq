@@ -456,37 +456,64 @@ function nearestDoor(): { door: Door; d: number } | null {
 }
 
 // ---------- animated props ----------
-// Paint the FIRST frame of an animated object on a map layer named
-// "Animated"; public/content/animations.json maps tileset+frame to a
-// loop: [{ "tileset": "<Tiled tileset name>", "frame": <first frame
-// id>, "frames": <count>, "fps": 8 }]. The game swaps the static tile
-// for a playing sprite animation.
-interface AnimCfg { tileset: string; frame: number; frames: number; fps: number; }
+// Animated objects work EXACTLY like the characters: the game loads a
+// whole animation spritesheet (a strip of frames) and plays it on
+// loop. The placeable props are listed in public/content/props.json:
+//   [{ "id": "tv", "sprite": "/assets/limezu/.../animated_old_tv.png", "fps": 6 }]
+// Place one in Tiled with a point object named "prop-<id>" (or give it
+// x/y in the JSON). The game measures the sheet itself, loads it
+// sliced and plays it - nothing to paint, no frame numbers to know.
+interface PropDef {
+  id: string;
+  sprite: string;
+  fps?: number;   // playback speed, default 6
+  fw?: number;    // frame width in px, default 16
+  fh?: number;    // frame height in px, default 16
+  x?: number;     // fallback position if no Tiled "prop-<id>" object
+  y?: number;
+}
 interface PlayingAnim { obj: any; base: number; frames: number; fps: number; }
 let playingAnims: PlayingAnim[] = [];
 let animTimer = 0;
 
-async function initAnimatedProps() {
-  const tiles = world.tilesByLayer["Animated"] ?? [];
-  if (!tiles.length) return;
-  let cfgs: AnimCfg[] = [];
+function measureSheet(url: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error("missing"));
+    img.src = url;
+  });
+}
+
+async function spawnProps() {
+  let defs: PropDef[] = [];
   try {
-    const res = await fetch("/content/animations.json");
-    if (res.ok) cfgs = await res.json();
-  } catch { /* no config: tiles stay static */ }
-  for (const t of tiles) {
-    const cfg = cfgs.find((c) => c.tileset === t.name && c.frame === t.frame);
-    if (!cfg) {
-      console.warn("Animated tile without animations.json entry: " + t.name + " frame " + t.frame);
-      continue;
+    const res = await fetch("/content/props.json");
+    if (res.ok) defs = await res.json();
+  } catch { /* no props file: fine */ }
+  for (const def of defs) {
+    const spot = world.objects.find((o) => o.name === "prop-" + def.id);
+    const x = spot ? spot.x : def.x;
+    const y = spot ? spot.y : def.y;
+    if (x === undefined || y === undefined) continue; // prop not placed on the map
+    try {
+      const fw = def.fw ?? 16;
+      const fh = def.fh ?? 16;
+      const { w, h } = await measureSheet(def.sprite);
+      const sx = Math.max(1, Math.round(w / fw));
+      const sy = Math.max(1, Math.round(h / fh));
+      await k.loadSprite("prop-" + def.id, def.sprite, { sliceX: sx, sliceY: sy });
+      const obj = k.add([
+        k.pos(x, y),
+        k.anchor("bot"),
+        k.sprite("prop-" + def.id, { frame: 0 }),
+      ]);
+      // single-row strips play frame by frame; taller sheets play
+      // linearly (row after row) - fine for LimeZu animated sheets.
+      playingAnims.push({ obj, base: 0, frames: sx * sy, fps: def.fps ?? 6 });
+    } catch {
+      console.warn("Animated prop failed to load: " + def.id + " (" + def.sprite + ")");
     }
-    t.obj.destroy(); // remove the static tile, add the playing sprite
-    const obj = k.add([
-      k.pos(t.x, t.y),
-      k.anchor("center"),
-      k.sprite(t.name, { frame: t.frame }),
-    ]);
-    playingAnims.push({ obj, base: t.frame, frames: cfg.frames, fps: cfg.fps });
   }
 }
 
@@ -579,9 +606,9 @@ async function buildWorld() {
 
   // The NPC cast (public/content/npcs.json + Tiled npc-<id> objects)
   await spawnNpcs();
-  // Doors + animated props (layers "Doors"/"DoorsOpen"/"Animated")
+  // Doors + animated props (Tiled "door-<id>" / "prop-<id>" objects)
   initDoors();
-  await initAnimatedProps();
+  await spawnProps();
 
   // Hotspot markers for everything the game knows how to interact with
   for (const o of world.objects) {

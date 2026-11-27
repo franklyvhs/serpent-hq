@@ -15,9 +15,9 @@
 //     optional open-door art on "DoorsOpen" (same cells, hidden until
 //     opened); a rectangle object named "door-<id>" on "Objects" marks
 //     the door region. The game toggles visibility + collision cells.
-//   - ANIMATED PROPS: paint the FIRST frame of an animated object on
-//     a layer "Animated"; main.ts swaps it for a playing loop using
-//     public/content/animations.json ({tileset, frame, frames, fps}).
+//   - ANIMATED PROPS: point objects named "prop-<id>" on "Objects"
+//     play the spritesheet listed for that id in
+//     public/content/props.json (character-style: no painting needed).
 // ============================================================
 
 export interface Vec {
@@ -150,7 +150,6 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
           if (!s) continue;
           const isDoors = layer.name === "Doors";
           const isDoorsOpen = layer.name === "DoorsOpen";
-          const isAnimated = layer.name === "Animated";
           const flags = (fh ? 1 : 0) | (fv ? 2 : 0) | (fd ? 4 : 0);
           const comps: any[] = [
             k.pos(x * tile + tile / 2, y * tile + tile / 2),
@@ -174,11 +173,11 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             case 7: comps.push(k.rotate(90), k.scale(-1, 1)); break; // D|H|V
           }
           const go = k.add(comps);
-          // Doors/Animated tiles keep live handles so the game can swap
-          // or animate them; DoorsOpen art stays hidden until a door opens
-          // (`.hidden` must be assigned after creation, not as a component).
-          if (isDoors || isAnimated) {
-            (tilesByLayer[layer.name] ??= []).push({ x: x * tile + tile / 2, y: y * tile + tile / 2, tx: x, ty: y, name: s.name, frame: s.frame, obj: go });
+          // Door tiles keep live handles so the game can swap them;
+          // DoorsOpen art stays hidden until a door opens (`.hidden`
+          // must be assigned after creation, not as a component).
+          if (isDoors) {
+            (tilesByLayer.Doors ??= []).push({ x: x * tile + tile / 2, y: y * tile + tile / 2, tx: x, ty: y, name: s.name, frame: s.frame, obj: go });
           } else if (isDoorsOpen) {
             go.hidden = true;
             (tilesByLayer.DoorsOpen ??= []).push({ x: x * tile + tile / 2, y: y * tile + tile / 2, tx: x, ty: y, name: s.name, frame: s.frame, obj: go });
