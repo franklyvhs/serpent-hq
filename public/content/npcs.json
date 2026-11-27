@@ -1,0 +1,44 @@
+[
+  {
+    "id": "klumgongyn",
+    "name": "Klumgongyn",
+    "sprite": "/assets/characters/npc_klumgongyn.png",
+    "color": [110, 220, 140],
+    "wander": true,
+    "wanderRadius": 40,
+    "speed": 32,
+    "dialogue": [
+      "Ah, Agent K. Have you filed your xenodiplomatic paperwork yet? No? Fascinating species.",
+      "Varnyr has three moons, Agent. Your coffee has zero. I rest my case.",
+      "Tiberian Dynamics Worldwide is a perfectly normal software company. Say it with me.",
+      "I have reviewed your planet's reports on the Order of Hades. Deeply rude organization."
+    ]
+  },
+  {
+    "id": "overseer",
+    "name": "The Overseer",
+    "sprite": "/assets/characters/npc_overseer.png",
+    "color": [170, 130, 200],
+    "wander": false,
+    "dialogue": [
+      "Contracts do not solve themselves, Agent K. Walk away from my corner and go solve one.",
+      "SERPENT has operated since 1968. Do not be the reason it stops.",
+      "The Order of Hades predates us all. Respect the threat. Then beat it."
+    ]
+  },
+  {
+    "id": "reyes",
+    "name": "Agent Reyes",
+    "sprite": "/assets/characters/npc_reyes.png",
+    "color": [90, 170, 230],
+    "wander": true,
+    "wanderRadius": 56,
+    "speed": 40,
+    "dialogue": [
+      "If the coffee machine is empty again, I am blaming you specifically, K.",
+      "I heard someone typed SNAKE into the BIOS last week. No idea who. Legend.",
+      "Field Ops sweep went clean. Boring is good. Boring keeps us alive.",
+      "The whiteboard in the breakroom is mandatory reading. GARY added a note."
+    ]
+  }
+]

@@ -112,10 +112,21 @@ window.addEventListener("serpent-whiteboard", ((e: CustomEvent) => {
   if (whiteboardOpen) for (const kk of Object.keys(keys)) keys[kk] = false;
 }) as EventListener);
 
+// The arcade machine overlay (SNAKELOR.EXE, src/arcade.js) same again.
+let arcadeOpen = false;
+window.addEventListener("serpent-arcade", ((e: CustomEvent) => {
+  arcadeOpen = !!e.detail?.open;
+  if (arcadeOpen) for (const kk of Object.keys(keys)) keys[kk] = false;
+}) as EventListener);
+
 const INTERACTABLES: Record<string, { label: string; action: () => void }> = {
   "contract-console": {
     label: "Agent K's computer",
     action: () => (window as any).SERPENT_COMPUTER?.open(),
+  },
+  "arcade-machine": {
+    label: "Arcade machine",
+    action: () => (window as any).SNAKELOR?.open(),
   },
   "notice-board": {
     label: "HQ notice board",
@@ -137,6 +148,227 @@ function nearestInteractable(): { spot: Hotspot; def: { label: string; action: (
     if (d <= bestD) { bestD = d; best = { spot, def }; }
   }
   return best;
+}
+
+// ---------- NPCs ----------
+// The cast lives in public/content/npcs.json (Frank edits it there);
+// each NPC is placed via a Tiled point object named "npc-<id>" on the
+// map's "Objects" layer (a plain x/y in the JSON works as a fallback).
+// Sprites follow the same whole-set export pattern as Agent K
+// (896x640 = 56x20 slices of 16x32, band order verified Nov 21).
+// Until a sprite PNG exists at the configured path the NPC renders as
+// a colored placeholder block with a name tag, so the cast can be
+// walked, talked to and debugged before Frank drops the art in.
+interface NpcDef {
+  id: string;
+  name: string;
+  sprite?: string;
+  color?: number[];
+  x?: number;
+  y?: number;
+  wander?: boolean;
+  wanderRadius?: number;
+  speed?: number;
+  dialogue: string[];
+}
+interface Npc extends NpcDef {
+  hx: number; hy: number; // home position
+  px: number; py: number; // current position
+  fx: number; fy: number; // facing vector (one axis dominant)
+  state: "idle" | "walk";
+  timer: number;
+  tx: number; ty: number; // walk target
+  walkObj: any;
+  idleObj: any;
+  tagObj: any | null;
+  hasSheet: boolean;
+  animTimer: number;
+}
+const npcs: Npc[] = [];
+let npcDefs: NpcDef[] = [];
+
+// Dialogue box (DOM, SERPENT OS chrome; built here, styled in
+// serpent-os.css).
+const dialogueEl = document.createElement("div");
+dialogueEl.id = "npc-dialogue";
+dialogueEl.className = "hidden";
+dialogueEl.innerHTML =
+  '<div class="nd-name"></div><div class="nd-text"></div>' +
+  '<div class="nd-hint">[E] next · [Esc] end conversation</div>';
+document.body.appendChild(dialogueEl);
+const dlgName = dialogueEl.querySelector(".nd-name") as HTMLElement;
+const dlgText = dialogueEl.querySelector(".nd-text") as HTMLElement;
+let dialogueOpen = false;
+let dialogueNpc: Npc | null = null;
+let dialogueLine = 0;
+
+function openDialogue(npc: Npc) {
+  dialogueNpc = npc;
+  dialogueLine = 0;
+  dialogueOpen = true;
+  dlgName.textContent = npc.name;
+  dlgText.textContent = npc.dialogue[0] ?? "...";
+  dialogueEl.classList.remove("hidden");
+}
+
+function advanceDialogue() {
+  if (!dialogueNpc) return;
+  dialogueLine++;
+  if (dialogueLine >= dialogueNpc.dialogue.length) { closeDialogue(); return; }
+  dlgText.textContent = dialogueNpc.dialogue[dialogueLine];
+}
+
+function closeDialogue() {
+  dialogueOpen = false;
+  dialogueNpc = null;
+  dialogueEl.classList.add("hidden");
+}
+
+function nearestNpc(): Npc | null {
+  let best: Npc | null = null;
+  let bestD = INTERACT_RANGE;
+  for (const npc of npcs) {
+    const d = Math.max(Math.abs(player.x - npc.px), Math.abs(player.y - npc.py));
+    if (d <= bestD) { bestD = d; best = npc; }
+  }
+  return best;
+}
+
+async function spriteExists(url: string): Promise<boolean> {
+  try { const r = await fetch(url, { method: "HEAD" }); return r.ok; } catch { return false; }
+}
+
+async function spawnNpcs() {
+  // cast definitions from public/content/npcs.json
+  try {
+    const res = await fetch("/content/npcs.json");
+    if (res.ok) npcDefs = await res.json();
+  } catch { /* no cast file: world still loads */ }
+  for (const def of npcDefs) {
+    // placement: Tiled point object "npc-<id>" wins, else JSON x/y
+    const spot = world.objects.find((o) => o.name === "npc-" + def.id);
+    const startX = spot ? spot.x : def.x;
+    const startY = spot ? spot.y : def.y;
+    if (startX === undefined || startY === undefined) {
+      console.warn("NPC skipped (no position): add a Tiled object named npc-" + def.id);
+      continue;
+    }
+    const npc: Npc = {
+      ...def,
+      hx: startX, hy: startY,
+      px: startX, py: startY,
+      fx: 0, fy: 1, // default facing down
+      state: "idle",
+      timer: 1 + Math.random() * 3,
+      tx: startX, ty: startY,
+      walkObj: null, idleObj: null, tagObj: null,
+      hasSheet: false,
+      animTimer: 0,
+    };
+    // sprite: whole-set sheet if the PNG exists, else placeholder block
+    if (def.sprite && (await spriteExists(def.sprite))) {
+      try {
+        await k.loadSprite("npc-" + def.id, def.sprite, { sliceX: 56, sliceY: 20 });
+        npc.hasSheet = true;
+      } catch { /* fall through to placeholder */ }
+    }
+    const col = def.color ?? [200, 200, 200];
+    if (npc.hasSheet) {
+      npc.walkObj = k.add([
+        k.pos(npc.px, npc.py),
+        k.sprite("npc-" + def.id, { frame: WALK_ROW + ANIM_FRAME.down }),
+        k.anchor("bot"),
+      ]);
+      npc.idleObj = k.add([
+        k.pos(npc.px, npc.py),
+        k.sprite("npc-" + def.id, { frame: IDLE_ROW + ANIM_FRAME.down }),
+        k.anchor("bot"),
+      ]);
+      npc.walkObj.hidden = true;
+    } else {
+      npc.walkObj = k.add([
+        k.pos(npc.px, npc.py),
+        k.rect(12, 22),
+        k.color(col[0], col[1], col[2]),
+        k.anchor("bot"),
+        k.opacity(0.9),
+      ]);
+      npc.tagObj = k.add([
+        k.pos(npc.px, npc.py - 26),
+        k.text(def.name, { size: 8 }),
+        k.color(255, 255, 255),
+        k.anchor("bot"),
+      ]);
+    }
+    npcs.push(npc);
+  }
+}
+
+function npcSolidAt(px: number, py: number): boolean {
+  return solidAt(px, py);
+}
+
+function updateNpcs(dt: number) {
+  for (const npc of npcs) {
+    if (npc.state === "idle") {
+      npc.timer -= dt;
+      if (npc.timer <= 0) {
+        if (npc.wander) {
+          // pick a reachable target within the wander radius of home
+          const r = npc.wanderRadius ?? 40;
+          for (let tries = 0; tries < 6; tries++) {
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 8 + Math.random() * r;
+            const tx = npc.hx + Math.cos(ang) * dist;
+            const ty = npc.hy + Math.sin(ang) * dist;
+            if (!npcSolidAt(tx, ty)) { npc.tx = tx; npc.ty = ty; npc.state = "walk"; break; }
+          }
+        }
+        npc.timer = 1.5 + Math.random() * 3.5;
+      }
+    } else {
+      // walk toward the target, one axis at a time (like the player)
+      const spd = npc.speed ?? 36;
+      const dx = npc.tx - npc.px;
+      const dy = npc.ty - npc.py;
+      if (Math.abs(dx) < 1.5 && Math.abs(dy) < 1.5) {
+        npc.px = npc.tx; npc.py = npc.ty;
+        npc.state = "idle";
+        npc.timer = 1.5 + Math.random() * 3.5;
+      } else {
+        let moved = false;
+        const stepX = Math.abs(dx) > 1.5 ? Math.sign(dx) * spd * dt : 0;
+        const stepY = Math.abs(dy) > 1.5 ? Math.sign(dy) * spd * dt : 0;
+        if (stepX && !npcSolidAt(npc.px + stepX, npc.py)) { npc.px += stepX; moved = true; }
+        if (stepY && !npcSolidAt(npc.px, npc.py + stepY)) { npc.py += stepY; moved = true; }
+        if (!moved) {
+          // stuck against furniture: give up and idle for a bit
+          npc.state = "idle";
+          npc.timer = 1 + Math.random() * 2;
+        } else {
+          if (Math.abs(dx) > Math.abs(dy)) { npc.fx = Math.sign(dx); npc.fy = 0; }
+          else { npc.fx = 0; npc.fy = Math.sign(dy); }
+          npc.animTimer += dt;
+        }
+      }
+    }
+    // render
+    if (npc.walkObj) { npc.walkObj.pos.x = npc.px; npc.walkObj.pos.y = npc.py; }
+    if (npc.idleObj) { npc.idleObj.pos.x = npc.px; npc.idleObj.pos.y = npc.py; }
+    if (npc.tagObj) { npc.tagObj.pos.x = npc.px; npc.tagObj.pos.y = npc.py - 26; }
+    if (npc.hasSheet && npc.idleObj && npc.walkObj) {
+      const dirName = npc.fx === 1 ? "right" : npc.fx === -1 ? "left" : npc.fy === -1 ? "up" : "down";
+      if (npc.state === "walk") {
+        npc.idleObj.hidden = true;
+        npc.walkObj.hidden = false;
+        npc.walkObj.frame = WALK_ROW + ANIM_FRAME[dirName] + (Math.floor(npc.animTimer * 8) % 6);
+      } else {
+        npc.walkObj.hidden = true;
+        npc.idleObj.hidden = false;
+        npc.idleObj.frame = IDLE_ROW + ANIM_FRAME[dirName] + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
+      }
+    }
+  }
 }
 
 // ---------- camera: fullscreen cover-crop with edge snap ----------
@@ -224,6 +456,9 @@ async function buildWorld() {
     k.anchor("bot"),
   ]);
 
+  // The NPC cast (public/content/npcs.json + Tiled npc-<id> objects)
+  await spawnNpcs();
+
   // Hotspot markers for everything the game knows how to interact with
   for (const o of world.objects) {
     if (!INTERACTABLES[o.name]) continue;
@@ -272,6 +507,7 @@ async function buildWorld() {
       idleObj.frame =
         IDLE_ROW + ANIM_FRAME[facing] + (Math.floor(idleTimer * IDLE_FPS) % 6);
     }
+    updateNpcs(dt);
     updateCamera();
     if (toastActive) {
       if (performance.now() > toastUntil) {
@@ -281,7 +517,18 @@ async function buildWorld() {
       return;
     }
     const near = nearestInteractable();
-    if (near) {
+    const nearNpc = nearestNpc();
+    // prefer whichever is actually closest (talk vs use)
+    const dSpot = near
+      ? Math.max(Math.abs(player.x - near.spot.x), Math.abs(player.y - near.spot.y))
+      : Infinity;
+    const dNpc = nearNpc
+      ? Math.max(Math.abs(player.x - nearNpc.px), Math.abs(player.y - nearNpc.py))
+      : Infinity;
+    if (nearNpc && dNpc <= dSpot) {
+      promptEl.textContent = "[E] Talk to " + nearNpc.name;
+      promptEl.classList.remove("hidden");
+    } else if (near) {
       promptEl.textContent = "[E] " + near.def.label;
       promptEl.classList.remove("hidden");
     } else {
@@ -297,9 +544,22 @@ window.addEventListener("keydown", (e) => {
   if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k2)) e.preventDefault();
   if (e.target instanceof HTMLInputElement) return; // typing in a field
   keys[k2] = true;
+  if (k2 === "escape" && dialogueOpen) { closeDialogue(); return; }
+  if (dialogueOpen) {
+    if (k2 === "e" && !e.repeat) advanceDialogue();
+    return;
+  }
   if (k2 === "e" && !e.repeat && overlaysDown()) {
+    const nearNpc = nearestNpc();
     const near = nearestInteractable();
-    if (near) near.def.action();
+    const dSpot = near
+      ? Math.max(Math.abs(player.x - near.spot.x), Math.abs(player.y - near.spot.y))
+      : Infinity;
+    const dNpc = nearNpc
+      ? Math.max(Math.abs(player.x - nearNpc.px), Math.abs(player.y - nearNpc.py))
+      : Infinity;
+    if (nearNpc && dNpc <= dSpot) openDialogue(nearNpc);
+    else if (near) near.def.action();
   }
 });
 window.addEventListener("keyup", (e) => {
@@ -308,7 +568,8 @@ window.addEventListener("keyup", (e) => {
 });
 
 function overlaysDown(): boolean {
-  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden") && !computerOpen && !whiteboardOpen;
+  return modal.classList.contains("hidden") && authOverlay.classList.contains("hidden")
+    && !computerOpen && !whiteboardOpen && !arcadeOpen && !dialogueOpen;
 }
 
 let contracts: Contract[] = [];
