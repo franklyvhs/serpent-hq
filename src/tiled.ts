@@ -176,6 +176,17 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
   const tilesByLayer: Record<string, DoorTile[]> = {};
   const animatedTiles: AnimatedTileInfo[] = [];
 
+  // PRE-PASS: collect wall cells before the main loop — the map's layer
+  // order puts "Behind Walls" BEFORE "Walls", so the depth boost must
+  // not depend on "Walls" having been processed already.
+  for (const layer of layers) {
+    if (layer.type === "tilelayer" && layer.name === "Walls" && layer.data) {
+      for (let i = 0; i < layer.data.length; i++) {
+        if ((layer.data[i] & 0x1fffffff) > 0) wallCells.add(i);
+      }
+    }
+  }
+
   for (const layer of layers) {
     if (layer.type === "tilelayer" && layer.data) {
       // A short/long array renders garbage and breaks collision silently:
