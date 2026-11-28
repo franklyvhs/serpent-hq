@@ -164,6 +164,14 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
   };
 
   const solid = new Uint8Array(mapW * mapH);
+  // Wall cells (for depth-boosting Behind Walls runs that sit on a wall)
+  const wallCells = new Set<number>();
+  // Behind Walls cells that sit flush on top of a wall: their art must
+  // draw at the wall's depth so a player walking the wall cap behind
+  // them gets fully occluded (closets against a wall hide the player
+  // in the 1-tile seam, instead of the player's head pasting over them)
+  const bwBoost = new Set<number>();
+  const bwBoostBottom = new Map<number, number>(); // cell -> first row below the run (the wall row)
   const objects: Interactable[] = [];
   const tilesByLayer: Record<string, DoorTile[]> = {};
   const animatedTiles: AnimatedTileInfo[] = [];
@@ -206,6 +214,7 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         for (let y = 0; y < mapH; y++) {
           for (let x = 0; x < mapW; x++) {
             if (!isHere(x, y)) continue;
+            if (layer.name === "Walls") wallCells.add(y * mapW + x);
             const inHorizontalBand = isHere(x - 1, y) || isHere(x + 1, y);
             const hasFaceRowBelow = isHere(x, y + 1);
             const hasTileAbove = isHere(x, y - 1);
@@ -213,6 +222,27 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             const southCap =
               layer.name === "Behind Walls" && inHorizontalBand && hasTileAbove;
             if (!northCap && !southCap) solid[y * mapW + x] = 1;
+          }
+        }
+        if (layer.name === "Behind Walls") {
+          // bottom-up: a cell is boosted if the run below it lands on a
+          // Walls cell; the whole run then shares one z (the wall's)
+          for (let y = mapH - 1; y >= 0; y--) {
+            for (let x = 0; x < mapW; x++) {
+              const cell = y * mapW + x;
+              if (!isHere(x, y)) continue;
+              const belowCell = (y + 1) * mapW + x;
+              const belowIsWall = y + 1 < mapH && wallCells.has(belowCell);
+              const belowIsBoosted =
+                y + 1 < mapH && isHere(x, y + 1) && bwBoost.has(belowCell);
+              if (belowIsWall) {
+                bwBoost.add(cell);
+                bwBoostBottom.set(cell, y + 1);
+              } else if (belowIsBoosted) {
+                bwBoost.add(cell);
+                bwBoostBottom.set(cell, bwBoostBottom.get(belowCell)!);
+              }
+            }
           }
         }
       }
@@ -254,7 +284,12 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
           // closets/trim must draw OVER a player standing in the wall
           // cap or closet cap rows (the depth effect), not under him.
           if (layer.name !== "Ground") {
-            comps.push(k.z((y + 1) * tile));
+            // Behind Walls runs flush on a wall draw at the wall's depth
+            const boostedCell = layer.name === "Behind Walls" && bwBoost.has(y * mapW + x);
+            const tileZ = boostedCell
+              ? (bwBoostBottom.get(y * mapW + x)! + 2) * tile
+              : (y + 1) * tile;
+            comps.push(k.z(tileZ));
           }
           switch (flags) {
             case 1: comps.push(k.scale(-1, 1)); break;               // H
