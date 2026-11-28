@@ -384,7 +384,21 @@ interface Door {
   cells: { tx: number; ty: number; orig: number }[]; // original solid values
   closedTiles: { obj: any }[];
   openTiles: { obj: any }[];
+  animTiles: DoorAnimTile[]; // animated tiles inside the region (E-driven)
   open: boolean;
+}
+// An animated tile captured by a door region plays its Tiled animation
+// ON DEMAND instead of looping: opening plays frames 0..mid and holds
+// there (mid = halfway frame of a symmetric open/close sheet), closing
+// plays mid..end and wraps back to frame 0.
+interface DoorAnimTile {
+  obj: any;
+  frames: number[];
+  durations: number[];
+  mid: number;        // index of the "fully open" frame
+  seq: number[] | null; // frame indices left to play (null = idle)
+  si: number;         // current index inside seq
+  t: number;         // ms elapsed on the current frame
 }
 let doors: Door[] = [];
 
@@ -408,12 +422,25 @@ function initDoors() {
     }
     const inRegion = (t: { tx: number; ty: number }) =>
       cells.some((c) => c.tx === t.tx && c.ty === t.ty);
+    // animated tiles inside the region become part of this door: they
+    // stop looping and are stepped by toggleDoor instead. Take them out
+    // of world.animatedTiles so the always-on player leaves them alone.
+    const animTiles: DoorAnimTile[] = [];
+    for (let i = world.animatedTiles.length - 1; i >= 0; i--) {
+      const at = world.animatedTiles[i];
+      if (!inRegion(at)) continue;
+      const mid = Math.floor(at.frames.length / 2);
+      at.obj.frame = at.frames[0];
+      animTiles.push({ obj: at.obj, frames: at.frames, durations: at.durations, mid, seq: null, si: 0, t: 0 });
+      world.animatedTiles.splice(i, 1);
+    }
     doors.push({
       name: o.name,
       x: o.x, y: o.y, w, h,
       cells,
       closedTiles: doorTiles.filter((t) => inRegion(t)).map((t) => ({ obj: t.obj })),
       openTiles: openTiles.filter((t) => inRegion(t)).map((t) => ({ obj: t.obj })),
+      animTiles,
       open: false,
     });
   }
@@ -424,6 +451,12 @@ function toggleDoor(door: Door) {
     for (const t of door.closedTiles) t.obj.hidden = true;
     for (const t of door.openTiles) t.obj.hidden = false;
     for (const c of door.cells) world.solid[c.ty * world.mapW + c.tx] = 0;
+    // play the opening half of any animated door tiles (0 -> mid)
+    for (const at of door.animTiles) {
+      at.seq = at.frames.map((_, i) => i).slice(0, at.mid + 1);
+      at.si = 0; at.t = 0;
+      at.obj.frame = at.frames[at.seq[0]];
+    }
     door.open = true;
   } else {
     // do not slam a door into the agent standing in the doorway
@@ -438,7 +471,36 @@ function toggleDoor(door: Door) {
     for (const t of door.closedTiles) t.obj.hidden = false;
     for (const t of door.openTiles) t.obj.hidden = true;
     for (const c of door.cells) world.solid[c.ty * world.mapW + c.tx] = c.orig;
+    // play the closing half (mid -> end), then wrap back to frame 0
+    for (const at of door.animTiles) {
+      at.seq = at.frames.map((_, i) => i).slice(at.mid).concat([0]);
+      at.si = 0; at.t = 0;
+      at.obj.frame = at.frames[at.seq[0]];
+    }
     door.open = false;
+  }
+}
+
+// step E-triggered animated door tiles (per-frame ms from the map)
+function updateDoorAnims(dt: number) {
+  for (const door of doors) {
+    for (const at of door.animTiles) {
+      if (!at.seq) continue;
+      at.t += dt * 1000;
+      let d = at.durations[at.seq[at.si]] ?? 100;
+      while (at.seq && at.t >= d) {
+        at.t -= d;
+        at.si++;
+        if (at.si >= at.seq.length) {
+          // sequence done: hold the final frame (open state / closed)
+          at.obj.frame = at.frames[at.seq[at.seq.length - 1]];
+          at.seq = null;
+          break;
+        }
+        at.obj.frame = at.frames[at.seq[at.si]];
+        d = at.durations[at.seq[at.si]] ?? 100;
+      }
+    }
   }
 }
 
@@ -712,6 +774,7 @@ async function buildWorld() {
         }
       }
     }
+    updateDoorAnims(dt);
     updateCamera();
     if (toastActive) {
       if (performance.now() > toastUntil) {

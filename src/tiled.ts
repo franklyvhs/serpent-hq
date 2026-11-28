@@ -58,6 +58,8 @@ export interface AnimatedTileInfo {
   obj: any;        // live game object whose .frame we step
   frames: number[];   // tile ids (sprite frames) in order
   durations: number[]; // ms per frame (Tiled animation editor)
+  tx: number;      // cell the tile was painted in (for door regions)
+  ty: number;
 }
 
 interface TiledTileset {
@@ -238,6 +240,8 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
               obj: go,
               frames: animDef.animation.map((f) => f.tileid),
               durations: animDef.animation.map((f) => f.duration),
+              tx: x,
+              ty: y,
             });
           }
           // Door tiles keep live handles so the game can swap them;
