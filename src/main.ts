@@ -59,6 +59,7 @@ const k = kaplay({
 
 const PLAYER_SPEED = 80; // px per second (16px tiles)
 const INTERACT_RANGE = 22; // px
+const AUTO_CLOSE_DIST = 40; // px: open doors auto-close once the player is this far from the doorway
 
 let world: TiledWorld;
 const player = { x: 0, y: 0 }; // px
@@ -775,6 +776,14 @@ async function buildWorld() {
       }
     }
     updateDoorAnims(dt);
+    // auto-close: once the player has walked away from an open door,
+    // slide it shut behind them (E to close still works when nearby).
+    for (const door of doors) {
+      if (!door.open) continue;
+      const dx = Math.max(door.x - player.x, 0, player.x - (door.x + door.w));
+      const dy = Math.max(door.y - player.y, 0, player.y - (door.y + door.h));
+      if (dx * dx + dy * dy > AUTO_CLOSE_DIST * AUTO_CLOSE_DIST) toggleDoor(door);
+    }
     updateCamera();
     if (toastActive) {
       if (performance.now() > toastUntil) {
