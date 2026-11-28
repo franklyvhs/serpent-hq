@@ -259,9 +259,10 @@ async function spawnNpcs() {
   for (const def of npcDefs) {
     // placement: Tiled point object "npc-<id>" wins, else JSON x/y
     const spot = world.objects.find((o) => o.name === "npc-" + def.id);
-    // A 16x16 Tiled object covers a cell: anchor the NPC's feet at the
-    // bottom-center of the object (same convention as props).
-    const startX = spot ? spot.x + (spot.width || 0) / 2 : def.x;
+    // A 16x16 Tiled object covers a cell: the object's x/y is its top-left,
+    // so feet anchor at the BOTTOM of the rect, but x stays as-authored
+    // (Frank places the object origin where the character should stand).
+    const startX = spot ? spot.x : def.x;
     const startY = spot ? spot.y + (spot.height || 0) : def.y;
     if (startX === undefined || startY === undefined) {
       console.warn("NPC skipped (no position): add a Tiled object named npc-" + def.id);
@@ -668,7 +669,7 @@ async function buildWorld() {
   player.x = world.spawn.x;
   player.y = world.spawn.y;
   const c = world.objects.find((o) => o.name === "contract-console");
-  if (c) consolePos = { x: c.x + (c.width || 0) / 2, y: c.y + (c.height || 0) };
+  if (c) consolePos = { x: c.x, y: c.y + (c.height || 0) };
   fitCamera();
 
   // Agent K: the whole-set generator export, one PNG. (Earlier this ran
@@ -709,8 +710,8 @@ async function buildWorld() {
   // Hotspot markers for everything the game knows how to interact with
   for (const o of world.objects) {
     if (!INTERACTABLES[o.name]) continue;
-    // anchor hotspots at the bottom-center of the object's cell
-    const hx = o.x + (o.width || 0) / 2;
+    // anchor hotspots at the bottom of the object's cell (x as-authored)
+    const hx = o.x;
     const hy = o.y + (o.height || 0);
     hotspots.push({ name: o.name, x: hx, y: hy });
     k.add([

@@ -271,8 +271,8 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
     mapH,
     solid,
     spawn: {
-      // a 16x16 spawn object covers a cell: feet go at its bottom-center
-      x: spawnObj.x + (spawnObj.width || 0) / 2,
+      // a 16x16 spawn object covers a cell: feet go at its bottom edge
+      x: spawnObj.x,
       y: spawnObj.y + (spawnObj.height || 0),
     },
     objects,
