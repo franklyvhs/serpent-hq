@@ -86,6 +86,10 @@ const WALK_ROW = 2 * 56; // slice index where the walk band starts
 // carries two distinct near-symmetric views (front/back candidate).
 const SIT_BAND: Record<number, number> = { 1: 4 * 56, 2: 5 * 56, 3: 6 * 56 };
 const SIT_FRAME: Record<string, number> = { right: 0, down: 0, left: 6, up: 6 };
+// Phone pose: band 6 is drawn facing the camera only (all 12 frames
+// silhouette-match the south standing pose); frame group is the whole
+// band as one 12-frame glance-down-at-phone loop.
+const PHONE_ROW = 6 * 56;
 const WALK_FPS = 10; // walk animation, frames per second
 const IDLE_FPS = 4;  // idle sway, frames per second
 
@@ -188,6 +192,9 @@ interface NpcDef {
   // All other NPC features (wander, sprites, sit, dx/dy) keep working
   // for NPCs that don't set this.
   hidden?: boolean;
+  // "phone": true = standing, facing the player, checking the phone
+  // (band 6 of the whole-set sheet, 12-frame glance loop)
+  phone?: boolean;
   // "sit": true = sit pose 1, 2 = sit pose 2 (never wanders; frame 0 of
   // the sit band is the resting pose). "face" sets initial facing.
   sit?: boolean | number;
@@ -403,10 +410,15 @@ function updateNpcs(dt: number) {
       } else {
         npc.walkObj.hidden = true;
         npc.idleObj.hidden = false;
-        const band = typeof npc.sit === "number" ? npc.sit : 1;
-        const poseRow = npc.sit ? (SIT_BAND[band] ?? SIT_BAND[1]) : IDLE_ROW;
-        const dirFrame = npc.sit ? SIT_FRAME[dirName] : ANIM_FRAME[dirName];
-        npc.idleObj.frame = poseRow + dirFrame + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
+        if (npc.phone) {
+          // one 12-frame loop, drawn facing the camera regardless of "face"
+          npc.idleObj.frame = PHONE_ROW + (Math.floor(npc.animTimer * IDLE_FPS) % 12);
+        } else {
+          const band = typeof npc.sit === "number" ? npc.sit : 1;
+          const poseRow = npc.sit ? (SIT_BAND[band] ?? SIT_BAND[1]) : IDLE_ROW;
+          const dirFrame = npc.sit ? SIT_FRAME[dirName] : ANIM_FRAME[dirName];
+          npc.idleObj.frame = poseRow + dirFrame + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
+        }
       }
     }
   }
