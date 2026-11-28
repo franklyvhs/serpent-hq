@@ -183,6 +183,13 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         }
         continue; // collision layer is never rendered
       }
+      if (layer.name === "Walls") {
+        // wall rows are always solid — no need to paint them on the
+        // Collision layer (doorways are gaps, so they stay passable)
+        for (let i = 0; i < layer.data.length && i < solid.length; i++) {
+          if (layer.data[i] > 0) solid[i] = 1;
+        }
+      }
       if (!layer.visible) continue;
       for (let y = 0; y < mapH; y++) {
         for (let x = 0; x < mapW; x++) {
