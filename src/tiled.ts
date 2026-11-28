@@ -184,10 +184,28 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         continue; // collision layer is never rendered
       }
       if (layer.name === "Walls") {
-        // wall rows are always solid — no need to paint them on the
-        // Collision layer (doorways are gaps, so they stay passable)
-        for (let i = 0; i < layer.data.length && i < solid.length; i++) {
-          if (layer.data[i] > 0) solid[i] = 1;
+        // Walls are automatically solid — no need to paint them on the
+        // Collision layer (doorways are gaps, so they stay passable).
+        // EXCEPT: the north row of a 2-row wall band stays walkable so
+        // the player can step behind it — the face row (south) and the
+        // cap row's tiles then draw over the player for a depth effect.
+        // A cap tile qualifies only if it has wall neighbours left or
+        // right (horizontal band) AND a wall tile below (the face
+        // row) AND no wall above (3-row walls stay fully solid, and
+        // vertical wall segments are never walkable).
+        const isWall = (x: number, y: number): boolean => {
+          if (x < 0 || x >= mapW || y < 0 || y >= mapH) return false;
+          return (layer.data[y * mapW + x] & 0x1fffffff) > 0;
+        };
+        for (let y = 0; y < mapH; y++) {
+          for (let x = 0; x < mapW; x++) {
+            if (!isWall(x, y)) continue;
+            const inHorizontalBand = isWall(x - 1, y) || isWall(x + 1, y);
+            const hasFaceRowBelow = isWall(x, y + 1);
+            const hasWallAbove = isWall(x, y - 1);
+            const walkableCap = inHorizontalBand && hasFaceRowBelow && !hasWallAbove;
+            if (!walkableCap) solid[y * mapW + x] = 1;
+          }
         }
       }
       if (!layer.visible) continue;
