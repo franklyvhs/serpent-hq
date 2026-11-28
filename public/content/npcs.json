@@ -7,7 +7,7 @@
     "wander": true,
     "wanderRadius": 40,
     "speed": 32,
-    "sit": true,
+    "sit": 3,
     "face": "up",
     "dialogue": [
       "Ah, Agent K. Have you filed your xenodiplomatic paperwork yet? No? Fascinating species.",

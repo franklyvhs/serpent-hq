@@ -79,8 +79,13 @@ const range = (n: number) => Array.from({ length: n }, (_i) => _i);
 const ANIM_FRAME: Record<string, number> = { right: 0, up: 6, left: 12, down: 18 };
 const IDLE_ROW = 1 * 56; // slice index where the idle band starts
 const WALK_ROW = 2 * 56; // slice index where the walk band starts
-const SIT1_ROW = 4 * 56; // band 4 of the whole-set sheet: sitting, pose 1
-const SIT2_ROW = 5 * 56; // band 5: sitting, pose 2
+// Sitting bands. The generator's sit exports do NOT follow the usual
+// right/up/left/down frame layout: each band only ships two frame
+// groups (0-5 and 6-11), so sitting direction maps to whichever group
+// exists. Bands 4/5 are mirrored side profiles (east/west); band 6
+// carries two distinct near-symmetric views (front/back candidate).
+const SIT_BAND: Record<number, number> = { 1: 4 * 56, 2: 5 * 56, 3: 6 * 56 };
+const SIT_FRAME: Record<string, number> = { right: 0, down: 0, left: 6, up: 6 };
 const WALK_FPS = 10; // walk animation, frames per second
 const IDLE_FPS = 4;  // idle sway, frames per second
 
@@ -254,8 +259,10 @@ async function spawnNpcs() {
   for (const def of npcDefs) {
     // placement: Tiled point object "npc-<id>" wins, else JSON x/y
     const spot = world.objects.find((o) => o.name === "npc-" + def.id);
-    const startX = spot ? spot.x : def.x;
-    const startY = spot ? spot.y : def.y;
+    // A 16x16 Tiled object covers a cell: anchor the NPC's feet at the
+    // bottom-center of the object (same convention as props).
+    const startX = spot ? spot.x + (spot.width || 0) / 2 : def.x;
+    const startY = spot ? spot.y + (spot.height || 0) : def.y;
     if (startX === undefined || startY === undefined) {
       console.warn("NPC skipped (no position): add a Tiled object named npc-" + def.id);
       continue;
@@ -379,8 +386,10 @@ function updateNpcs(dt: number) {
       } else {
         npc.walkObj.hidden = true;
         npc.idleObj.hidden = false;
-        const poseRow = npc.sit === 2 ? SIT2_ROW : npc.sit ? SIT1_ROW : IDLE_ROW;
-        npc.idleObj.frame = poseRow + ANIM_FRAME[dirName] + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
+        const band = typeof npc.sit === "number" ? npc.sit : 1;
+        const poseRow = npc.sit ? (SIT_BAND[band] ?? SIT_BAND[1]) : IDLE_ROW;
+        const dirFrame = npc.sit ? SIT_FRAME[dirName] : ANIM_FRAME[dirName];
+        npc.idleObj.frame = poseRow + dirFrame + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
       }
     }
   }
@@ -659,7 +668,7 @@ async function buildWorld() {
   player.x = world.spawn.x;
   player.y = world.spawn.y;
   const c = world.objects.find((o) => o.name === "contract-console");
-  if (c) consolePos = { x: c.x, y: c.y };
+  if (c) consolePos = { x: c.x + (c.width || 0) / 2, y: c.y + (c.height || 0) };
   fitCamera();
 
   // Agent K: the whole-set generator export, one PNG. (Earlier this ran
@@ -700,9 +709,12 @@ async function buildWorld() {
   // Hotspot markers for everything the game knows how to interact with
   for (const o of world.objects) {
     if (!INTERACTABLES[o.name]) continue;
-    hotspots.push({ name: o.name, x: o.x, y: o.y });
+    // anchor hotspots at the bottom-center of the object's cell
+    const hx = o.x + (o.width || 0) / 2;
+    const hy = o.y + (o.height || 0);
+    hotspots.push({ name: o.name, x: hx, y: hy });
     k.add([
-      k.pos(o.x, o.y),
+      k.pos(hx, hy),
       k.circle(6),
       k.color(34, 211, 238),
       k.opacity(0.35),

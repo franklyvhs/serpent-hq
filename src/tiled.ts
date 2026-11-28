@@ -270,7 +270,11 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
     mapW,
     mapH,
     solid,
-    spawn: { x: spawnObj.x, y: spawnObj.y },
+    spawn: {
+      // a 16x16 spawn object covers a cell: feet go at its bottom-center
+      x: spawnObj.x + (spawnObj.width || 0) / 2,
+      y: spawnObj.y + (spawnObj.height || 0),
+    },
     objects,
     tilesByLayer,
     animatedTiles,
