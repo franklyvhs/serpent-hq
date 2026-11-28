@@ -28,13 +28,27 @@ body {
 #game { display: block; image-rendering: pixelated; }
 #prompt {
   position: absolute;
-  bottom: 60px;
-  left: 0; right: 0;
-  text-align: center;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: rgba(6, 10, 20, 0.92);
+  border: 1px solid var(--neon-dim);
+  border-radius: 3px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.55);
   color: var(--neon);
-  text-shadow: 0 0 8px var(--neon);
-  font-size: 14px;
+  text-shadow: 0 0 6px var(--neon-dim);
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
   pointer-events: none;
+}
+/* transient game notifications (door opened, coffee brewed...) get an
+   amber accent so they read differently from the [E] interaction hint */
+#prompt.notice {
+  border-color: rgba(216, 178, 74, 0.55);
+  color: #f2d488;
+  text-shadow: none;
 }
 #hud {
   position: absolute;

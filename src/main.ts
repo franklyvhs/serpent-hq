@@ -103,9 +103,18 @@ let toastUntil = 0;
 
 function toast(msg: string) {
   promptEl.textContent = msg;
+  promptEl.classList.add("notice");
   promptEl.classList.remove("hidden");
   toastActive = true;
   toastUntil = performance.now() + 3200;
+}
+
+// Proximity hints ("[E] Talk to...") reuse the same chip minus the
+// notice accent.
+function setPrompt(msg: string) {
+  promptEl.classList.remove("notice");
+  promptEl.textContent = msg;
+  promptEl.classList.remove("hidden");
 }
 
 // ---------- SERPENT OS desk computer (src/computer.js) ----------
@@ -200,6 +209,11 @@ interface NpcDef {
   sit?: boolean | number;
   face?: "down" | "up" | "left" | "right";
   dialogue: string[];
+  // Optional conversation topics shown after the opening lines (like a
+  // mini FAQ). Each topic is a clickable/number-key choice; the NPC's
+  // reply plays like normal dialogue, then the topics come back so the
+  // player can keep asking (Esc ends the conversation).
+  choices?: { label: string; reply: string[] }[];
 }
 interface Npc extends NpcDef {
   hx: number; hy: number; // home position
@@ -224,33 +238,94 @@ dialogueEl.id = "npc-dialogue";
 dialogueEl.className = "hidden";
 dialogueEl.innerHTML =
   '<div class="nd-name"></div><div class="nd-text"></div>' +
+  '<div class="nd-choices hidden"></div>' +
   '<div class="nd-hint">[E] next · [Esc] end conversation</div>';
 document.body.appendChild(dialogueEl);
 const dlgName = dialogueEl.querySelector(".nd-name") as HTMLElement;
 const dlgText = dialogueEl.querySelector(".nd-text") as HTMLElement;
+const dlgChoices = dialogueEl.querySelector(".nd-choices") as HTMLElement;
+const dlgHint = dialogueEl.querySelector(".nd-hint") as HTMLElement;
 let dialogueOpen = false;
 let dialogueNpc: Npc | null = null;
 let dialogueLine = 0;
+let dialogueLines: string[] = []; // current queue being played
+let dialogueMode: "lines" | "choices" = "lines";
+
+const DLG_HINT_LINES = "[E] next · [Esc] end conversation";
+
+function hideChoices() {
+  dlgChoices.classList.add("hidden");
+  dlgChoices.innerHTML = "";
+}
+
+function showChoices() {
+  if (!dialogueNpc || !dialogueNpc.choices?.length) { closeDialogue(); return; }
+  dialogueMode = "choices";
+  hideChoices();
+  for (let i = 0; i < dialogueNpc.choices.length; i++) {
+    const c = dialogueNpc.choices[i];
+    const btn = document.createElement("button");
+    btn.className = "nd-choice";
+    btn.type = "button";
+    btn.textContent = (i + 1) + ". " + c.label;
+    btn.addEventListener("click", () => pickChoice(i));
+    dlgChoices.appendChild(btn);
+  }
+  dlgChoices.classList.remove("hidden");
+  dlgHint.textContent = "[1-" + dialogueNpc.choices.length + "] or click a topic · [Esc] end conversation";
+}
+
+function pickChoice(i: number) {
+  if (!dialogueNpc?.choices?.[i]) return;
+  dialogueLines = dialogueNpc.choices[i].reply.length
+    ? dialogueNpc.choices[i].reply
+    : ["..."];
+  dialogueLine = 0;
+  dialogueMode = "lines";
+  hideChoices();
+  dlgHint.textContent = DLG_HINT_LINES;
+  dlgText.textContent = dialogueLines[0];
+}
 
 function openDialogue(npc: Npc) {
   dialogueNpc = npc;
-  dialogueLine = 0;
   dialogueOpen = true;
   dlgName.textContent = npc.name;
-  dlgText.textContent = npc.dialogue[0] ?? "...";
+  hideChoices();
+  dlgHint.textContent = DLG_HINT_LINES;
+  dialogueLines = npc.dialogue ?? [];
+  dialogueLine = 0;
+  if (dialogueLines.length) {
+    dialogueMode = "lines";
+    dlgText.textContent = dialogueLines[0];
+  } else if (npc.choices?.length) {
+    dlgText.textContent = "";
+    showChoices();
+  } else {
+    dlgText.textContent = "...";
+    dialogueMode = "lines";
+  }
   dialogueEl.classList.remove("hidden");
 }
 
 function advanceDialogue() {
   if (!dialogueNpc) return;
+  if (dialogueMode === "choices") return; // waiting for a topic pick
   dialogueLine++;
-  if (dialogueLine >= dialogueNpc.dialogue.length) { closeDialogue(); return; }
-  dlgText.textContent = dialogueNpc.dialogue[dialogueLine];
+  if (dialogueLine < dialogueLines.length) {
+    dlgText.textContent = dialogueLines[dialogueLine];
+    return;
+  }
+  // lines finished: offer topics again if there are any, else close
+  if (dialogueNpc.choices?.length) showChoices();
+  else closeDialogue();
 }
 
 function closeDialogue() {
   dialogueOpen = false;
   dialogueNpc = null;
+  dialogueMode = "lines";
+  hideChoices();
   dialogueEl.classList.add("hidden");
 }
 
@@ -842,6 +917,7 @@ async function buildWorld() {
       if (performance.now() > toastUntil) {
         toastActive = false;
         promptEl.classList.add("hidden");
+        promptEl.classList.remove("notice");
       }
       return;
     }
@@ -857,14 +933,11 @@ async function buildWorld() {
       : Infinity;
     const dDoor = nearDoorRes ? nearDoorRes.d : Infinity;
     if (nearNpc && dNpc <= dSpot && dNpc <= dDoor) {
-      promptEl.textContent = "[E] Talk to " + nearNpc.name;
-      promptEl.classList.remove("hidden");
+      setPrompt("[E] Talk to " + nearNpc.name);
     } else if (nearDoorRes && dDoor <= dSpot) {
-      promptEl.textContent = nearDoorRes.door.open ? "[E] Close door" : "[E] Open door";
-      promptEl.classList.remove("hidden");
+      setPrompt(nearDoorRes.door.open ? "[E] Close door" : "[E] Open door");
     } else if (near) {
-      promptEl.textContent = "[E] " + near.def.label;
-      promptEl.classList.remove("hidden");
+      setPrompt("[E] " + near.def.label);
     } else {
       promptEl.classList.add("hidden");
     }
@@ -880,6 +953,11 @@ window.addEventListener("keydown", (e) => {
   keys[k2] = true;
   if (k2 === "escape" && dialogueOpen) { closeDialogue(); return; }
   if (dialogueOpen) {
+    // number keys pick a conversation topic while the list is up
+    if (dialogueMode === "choices" && /^[1-9]$/.test(e.key)) {
+      pickChoice(parseInt(e.key, 10) - 1);
+      return;
+    }
     if (k2 === "e" && !e.repeat) advanceDialogue();
     return;
   }

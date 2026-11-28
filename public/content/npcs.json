@@ -12,35 +12,215 @@
       "Varnyr has three moons, Agent. Your coffee has zero. I rest my case.",
       "Tiberian Dynamics Worldwide is a perfectly normal software company. Say it with me.",
       "I have reviewed your planet's reports on the Order of Hades. Deeply rude organization."
+    ],
+    "choices": [
+      {
+        "label": "What's Varnyr like?",
+        "reply": [
+          "Three moons, triple the tides, triple the paperwork. I miss it chronically.",
+          "And no, you may not visit. Your species is still on the 'do not touch' list."
+        ]
+      },
+      {
+        "label": "How do the finances look?",
+        "reply": [
+          "Tiberian Dynamics Worldwide remains a perfectly normal software company with no maritime fleet whatsoever.",
+          "Payroll clears on the 1st. The 1st of which moon is an internal matter."
+        ]
+      },
+      {
+        "label": "Care for a chess match?",
+        "reply": [
+          "Bold. Mei is the only one in this building I refuse a rematch with. But for you, Agent K, I shall be merciful.",
+          "Fox and I remain undefeated as doubles. Challenge us and I will show you what a Krondakhyr invasion feels like."
+        ]
+      }
     ]
   },
   {
     "id": "overseer",
-    "name": "The Overseer",
-    "sprite": "/assets/characters/npc_overseer.png",
+    "name": "Julia Sharpe",
+    "sprite": "/assets/characters/serpent_julia.png",
     "color": [170, 130, 200],
     "wander": false,
     "sit": true,
     "face": "up",
     "dialogue": [
-      "Contracts do not solve themselves, Agent K. Walk away from my corner and go solve one.",
-      "SERPENT has operated since 1968. Do not be the reason it stops.",
-      "The Order of Hades predates us all. Respect the threat. Then beat it."
+      "Agent K. Good. I was starting to think the coffee machine was my only visitor with clearance.",
+      "Edmund Vance recruited me with a postcard that read 'You'll know when it's time.' Infuriating man. He was right.",
+      "Whatever you're about to ask: yes, the postcards above my desk are coded. No, I won't tell you what they say."
+    ],
+    "choices": [
+      {
+        "label": "You were at MI6. What was your callsign?",
+        "reply": [
+          "Sable. A negotiator's callsign should be something the other side can't quite catch. Keeps them humble.",
+          "I handled the people the fire brigade refused to. Then Prague happened, and here I am."
+        ]
+      },
+      {
+        "label": "Tell me about Prague.",
+        "reply": [
+          "A hostage exchange. Fourteen minutes in I realized we were the bait, not the buyers.",
+          "So I turned the setup inside out and handed SERPENT an entire Order of Hades cell instead. Officially logged as 'a routine debrief.'"
+        ]
+      },
+      {
+        "label": "Any advice for me, ma'am?",
+        "reply": [
+          "Two things. Trust your team further than you can see them.",
+          "And read the notice board. GARY has been writing things again."
+        ]
+      }
     ]
   },
   {
-    "id": "reyes",
-    "name": "Agent Reyes",
-    "sprite": "/assets/characters/npc_reyes.png",
+    "id": "oriana",
+    "name": "Oriana Olivetti",
+    "sprite": "/assets/characters/serpent_oriana.png",
     "color": [90, 170, 230],
-    "wander": true,
-    "wanderRadius": 56,
-    "speed": 40,
+    "wander": false,
     "dialogue": [
-      "If the coffee machine is empty again, I am blaming you specifically, K.",
-      "I heard someone typed SNAKE into the BIOS last week. No idea who. Legend.",
-      "Field Ops sweep went clean. Boring is good. Boring keeps us alive.",
-      "The whiteboard in the breakroom is mandatory reading. GARY added a note."
+      "If you touch my mate gourd, Agent, I will treat it as a hostile signal intrusion.",
+      "Your phone is leaking telemetry like a Cold War submarine. Come see me after lunch.",
+      "Operation Runner: my vacation photos became location intelligence. Never let anyone tell you hobbies don't matter.",
+      "Boiling water, metal straw, no sugar. Get it wrong again and we continue this conversation in Spanish."
+    ]
+  },
+  {
+    "id": "dmitri",
+    "name": "Dmitri Zechev",
+    "sprite": "/assets/characters/serpent_dmitri.png",
+    "color": [230, 170, 90],
+    "wander": true,
+    "wanderRadius": 48,
+    "speed": 36,
+    "dialogue": [
+      "The Order of Hades sent us a phishing campaign this morning. I mailed it back with their own infrastructure inside. Petty? Yes. Satisfying? Also yes.",
+      "I taught myself to code at seven, on a machine that booted out of pure spite. Your lab equipment bores me.",
+      "That framed screenshot is my first indictment. My first exposé helped take down a corrupt government. I was very proud.",
+      "Rule one of red team: if you're polite to the firewall, you deserve to be logged."
+    ]
+  },
+  {
+    "id": "mei",
+    "name": "Mei Huang",
+    "sprite": "/assets/characters/serpent_mei.png",
+    "color": [220, 120, 160],
+    "wander": false,
+    "dialogue": [
+      "You have the posture of someone withholding something, Agent K. Sit down before I profile you out loud.",
+      "Twelve languages, and the only one that matters here is Volrac glyph script. MI6 called my thesis 'academic curiosity.' It's the reason this building still stands.",
+      "Klumgongyn says my thesis is dangerous. It's only dangerous to people in cults. Statistically, you're fine. Probably.",
+      "Chess on Thursday? Careful. I'm the only person in this HQ he won't give a rematch."
+    ]
+  },
+  {
+    "id": "isabella",
+    "name": "Isabella Moreno",
+    "sprite": "/assets/characters/serpent_isabella.png",
+    "color": [230, 120, 80],
+    "wander": false,
+    "dialogue": [
+      "Four centuries of archives, Agent. The Order of Hades was hiding in plain sight the whole time. In triplicate, usually.",
+      "My grandmother's documents found them before any satellite did. Respect the paper trail.",
+      "The photos on my desk are my parents. Everything I do in this building is for them.",
+      "An artifact is genuine if the paperwork survives. The Order kept excellent records. That was their mistake."
+    ]
+  },
+  {
+    "id": "fox",
+    "name": "Fox Meyer",
+    "sprite": "/assets/characters/serpent_fox.png",
+    "color": [120, 210, 190],
+    "wander": false,
+    "dialogue": [
+      "I really do want to believe, Agent K. It's on my coffee mug, my file, and my entire career.",
+      "The TFBI says I 'separated.' That's the single paper record I left. Everything else, I erased myself.",
+      "2015, Nevada: officially 'weather balloon debris.' I logged the Krondakhyr telemetry before it self-destructed. Balloons don't scream in forty frequencies.",
+      "Chess night, first Friday of the month. Klumgongyn and I are undefeated. It's the only statistic I care about."
+    ]
+  },
+  {
+    "id": "james",
+    "name": "James Brown",
+    "sprite": "/assets/characters/serpent_james.png",
+    "color": [200, 200, 110],
+    "wander": false,
+    "dialogue": [
+      "Shaken, not stirred, Agent K. If you have to ask why, you're not ready for the tuxedo missions.",
+      "Five years undercover in Halston & Grey. An auction house. An Order of Hades front. I got very good at nodding at vases.",
+      "Poker night: I win through statistics, not cheating. The statistics of other people's tells, specifically.",
+      "Julia called, I left MI6. Some costs you only pay once. A decade of forged relationships, one real marriage. I don't recommend the write-up."
+    ]
+  },
+  {
+    "id": "cassandra",
+    "name": "Cassandra Laurent",
+    "sprite": "/assets/characters/serpent_cassandra.png",
+    "color": [160, 140, 230],
+    "wander": false,
+    "dialogue": [
+      "Power leaks, Agent K. My job is knowing where, in fifteen languages.",
+      "Brussels ignored my dossier for six years while it quietly killed anomaly legislation in three parliaments. SERPENT acted in a month.",
+      "I can end an argument with Klumgongyn in under a minute. The trick is to be more polite than he is. It's devastating.",
+      "Half my contact book owes me unspecified favors. The other half owes me specified ones. Both halves are useful."
+    ]
+  },
+  {
+    "id": "gabriel",
+    "name": "Gabriel Adams",
+    "sprite": "/assets/characters/serpent_gabriel.png",
+    "color": [120, 180, 230],
+    "wander": false,
+    "dialogue": [
+      "BTRU eats after everyone else, Agent. That includes you, on days the coffee machine is empty.",
+      "Afghanistan, second deployment. Six objects in that crash zone that belonged to nothing human. Seven days holding it. Three people at the debrief. I've been here since.",
+      "I don't know anything about a boxing gym in Baltimore. Ask me again and I still won't.",
+      "SERPENT is not a hit squad. But if a firefight starts, stand behind me and don't apologize."
+    ]
+  },
+  {
+    "id": "mikko",
+    "name": "Mikko Häyhä",
+    "sprite": "/assets/characters/serpent_mikko.png",
+    "color": [180, 220, 230],
+    "wander": false,
+    "dialogue": [
+      "Eastern Finland. The region produces silence, patience, and marksmen. In that order.",
+      "Eleven days at minus forty in Svalbard, guarding a 'meteor impact site' that was no meteor. When SERPENT offered me a job on the spot, it was the warmest thing that happened all month.",
+      "My rifle's name is Aila. After my grandmother. Whether that was a compliment is between the three of us.",
+      "Am I related to a certain legendary Winter War sniper? I neither confirm nor deny, Agent. But I appreciate the question."
+    ]
+  },
+  {
+    "id": "amir",
+    "name": "Amir Hussaini",
+    "sprite": "/assets/characters/serpent_amir.png",
+    "color": [230, 150, 120],
+    "wander": true,
+    "wanderRadius": 40,
+    "speed": 34,
+    "dialogue": [
+      "My father taught me how buildings stand up. Then he taught me all the interesting ways they change their mind.",
+      "By the time the briefing started, I had the bazaar's blasting requirements mapped from memory. People looked at me strangely. People looked at the detonators strangely too.",
+      "Liam has patched me up after more than one 'experiment.' He calls me mostly reliable. From him, that's a love letter.",
+      "Everything is an explosive if you respect it enough, Agent K."
+    ]
+  },
+  {
+    "id": "liam",
+    "name": "Liam Irwin",
+    "sprite": "/assets/characters/serpent_liam.png",
+    "color": [150, 220, 120],
+    "wander": true,
+    "wanderRadius": 48,
+    "speed": 38,
+    "dialogue": [
+      "Three weeks alone in jungle, injured, with a broken radio. The search teams wrote me off. I call that a long weekend.",
+      "Snakebite, gunshot, or Amir's experiments. I've treated all three. At least the snake apologized.",
+      "Fox and Klumgongyn are unbeaten at chess doubles. It has ended at least one of my friendships. I remain young. I remain hopeful.",
+      "Nature settles all arguments, Agent. Our job is making sure the Order of Hades never gets a rematch."
     ]
   }
 ]

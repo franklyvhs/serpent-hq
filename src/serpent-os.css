@@ -825,3 +825,39 @@ table.scores tr.me td { background: #ffffcc; }
   color: #404040;
   text-align: right;
 }
+
+/* ============================================================
+   NPC DIALOGUE — conversation topics (choice buttons)
+   ============================================================ */
+#npc-dialogue .nd-choices {
+  margin: 0 6px 6px;
+  padding: 4px;
+  background: #c0c0c0;
+  border: 2px solid;
+  border-color: #808080 #fff #fff #808080;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#npc-dialogue .nd-choices.hidden { display: none; }
+#npc-dialogue .nd-choice {
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  padding: 4px 8px;
+  background: #c0c0c0;
+  color: #000;
+  border: 2px solid;
+  border-color: #fff #000 #000 #fff;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
+  cursor: pointer;
+}
+#npc-dialogue .nd-choice:hover { color: #000080; }
+#npc-dialogue .nd-choice:focus {
+  outline: 1px dotted #000;
+  outline-offset: -5px;
+}
+#npc-dialogue .nd-choice:active {
+  border-color: #000 #fff #fff #000;
+  box-shadow: inset 1px 1px 0 #808080;
+}
