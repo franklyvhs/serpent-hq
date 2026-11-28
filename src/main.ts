@@ -482,6 +482,7 @@ interface PropDef {
 interface PlayingAnim { obj: any; base: number; frames: number; fps: number; radius?: number; cur: number; timer: number; }
 let playingAnims: PlayingAnim[] = [];
 let animTimer = 0;
+let tileAnimClock = 0; // ms clock for Tiled tile animations (per-frame durations)
 
 function measureSheet(url: string): Promise<{ w: number; h: number }> {
   return new Promise((resolve, reject) => {
@@ -692,6 +693,23 @@ async function buildWorld() {
         a.obj.frame = a.base + a.cur;
       } else {
         a.obj.frame = a.base + (Math.floor(animTimer * a.fps) % a.frames);
+      }
+    }
+    // Tiled Tile Animation Editor: step tiles that carry animation data
+    // (frames + per-frame ms durations come from the map JSON).
+    if (world.animatedTiles.length) {
+      tileAnimClock += dt * 1000;
+      for (const at of world.animatedTiles) {
+        let total = 0;
+        for (const d of at.durations) total += d;
+        let t = tileAnimClock % total;
+        for (let i = 0; i < at.frames.length; i++) {
+          if (t < at.durations[i]) {
+            at.obj.frame = at.frames[i];
+            break;
+          }
+          t -= at.durations[i];
+        }
       }
     }
     updateCamera();

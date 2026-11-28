@@ -51,6 +51,13 @@ export interface TiledWorld {
   spawn: Vec;                // px
   objects: Interactable[];  // named objects from "Objects" layer (px)
   tilesByLayer: Record<string, DoorTile[]>; // "Doors" / "DoorsOpen" / "Animated" tile handles
+  animatedTiles: AnimatedTileInfo[]; // Tiled tile animations to step every frame
+}
+
+export interface AnimatedTileInfo {
+  obj: any;        // live game object whose .frame we step
+  frames: number[];   // tile ids (sprite frames) in order
+  durations: number[]; // ms per frame (Tiled animation editor)
 }
 
 interface TiledTileset {
@@ -61,6 +68,8 @@ interface TiledTileset {
   tilecount: number;
   tilewidth: number;
   tileheight: number;
+  // Tiled stores per-tile meta here, incl. the Tile Animation Editor data
+  tiles?: { id: number; animation?: { tileid: number; duration: number }[] }[];
 }
 
 interface TiledLayer {
@@ -137,16 +146,16 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
     loaded.push({ ts, name: ts.name, chunkRows, chunked: true });
   }
 
-  const gidToSprite = (gid: number): { name: string; frame: number } | null => {
+  const gidToSprite = (gid: number): { name: string; frame: number; ts: TiledTileset } | null => {
     if (gid <= 0) return null;
     for (let i = loaded.length - 1; i >= 0; i--) {
       const e = loaded[i];
       if (gid >= e.ts.firstgid) {
         const frame = gid - e.ts.firstgid;
-        if (!e.chunked) return { name: e.name, frame };
+        if (!e.chunked) return { name: e.name, frame, ts: e.ts };
         const perChunk = e.ts.columns * e.chunkRows;
         const chunk = Math.floor(frame / perChunk);
-        return { name: e.name + "~" + chunk, frame: frame - chunk * perChunk };
+        return { name: e.name + "~" + chunk, frame: frame - chunk * perChunk, ts: e.ts };
       }
     }
     return null;
@@ -155,6 +164,7 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
   const solid = new Uint8Array(mapW * mapH);
   const objects: Interactable[] = [];
   const tilesByLayer: Record<string, DoorTile[]> = {};
+  const animatedTiles: AnimatedTileInfo[] = [];
 
   for (const layer of layers) {
     if (layer.type === "tilelayer" && layer.data) {
@@ -186,11 +196,18 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
           const gid = raw & 0x1fffffff;
           const s = gidToSprite(gid);
           if (!s) continue;
+          // Tiled renders tiles BIGGER than the map's tile size anchored
+          // to the cell's BOTTOM-LEFT (they extend up/right; see the TMX
+          // format docs). Match that here so oversized tiles (32x32 door
+          // frames on this 16px map) land exactly where Tiled shows them.
+          const big = s.ts.tilewidth > tile || s.ts.tileheight > tile;
+          const px = big ? x * tile + s.ts.tilewidth / 2 : x * tile + tile / 2;
+          const py = big ? (y + 1) * tile - s.ts.tileheight / 2 : y * tile + tile / 2;
           const isDoors = layer.name === "Doors";
           const isDoorsOpen = layer.name === "DoorsOpen";
           const flags = (fh ? 1 : 0) | (fv ? 2 : 0) | (fd ? 4 : 0);
           const comps: any[] = [
-            k.pos(x * tile + tile / 2, y * tile + tile / 2),
+            k.pos(px, py),
             k.anchor("center"),
             k.sprite(s.name, { frame: s.frame }),
           ];
@@ -211,6 +228,18 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             case 7: comps.push(k.rotate(90), k.scale(-1, 1)); break; // D|H|V
           }
           const go = k.add(comps);
+          // Tiled Tile Animation Editor data: remember tiles carrying an
+          // animation so main.ts can step their frames (duration in ms).
+          const animDef = (s.ts.tiles ?? []).find(
+            (tl) => tl.id === s.frame && tl.animation && tl.animation.length > 1
+          );
+          if (animDef && animDef.animation) {
+            animatedTiles.push({
+              obj: go,
+              frames: animDef.animation.map((f) => f.tileid),
+              durations: animDef.animation.map((f) => f.duration),
+            });
+          }
           // Door tiles keep live handles so the game can swap them;
           // DoorsOpen art stays hidden until a door opens (`.hidden`
           // must be assigned after creation, not as a component).
@@ -240,5 +269,6 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
     spawn: { x: spawnObj.x, y: spawnObj.y },
     objects,
     tilesByLayer,
+    animatedTiles,
   };
 }
