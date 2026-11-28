@@ -246,14 +246,14 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             k.anchor("center"),
             k.sprite(s.name, { frame: s.frame }),
           ];
-          // Depth sorting: every tile layer EXCEPT the background ones
-          // ("Ground" floor, "Behind Walls" trim) gets z = the tile's
-          // bottom edge. The renderer z-sorts these against characters
-          // (whose z is their feet position): north of furniture =
-          // behind it, south = in front. This lets chairs/desks draw
-          // over a seated NPC (sitting-in look) while a character
-          // standing south of furniture still occludes it.
-          if (layer.name !== "Ground" && layer.name !== "Behind Walls") {
+          // Depth sorting: every tile layer EXCEPT "Ground" (the floor,
+          // always under everything) gets z = the tile's bottom edge.
+          // The renderer z-sorts these against characters (whose z is
+          // their feet position): north of furniture = behind it,
+          // south = in front. This includes "Behind Walls" — its
+          // closets/trim must draw OVER a player standing in the wall
+          // cap or closet cap rows (the depth effect), not under him.
+          if (layer.name !== "Ground") {
             comps.push(k.z((y + 1) * tile));
           }
           switch (flags) {
