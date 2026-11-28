@@ -213,13 +213,16 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             k.anchor("center"),
             k.sprite(s.name, { frame: s.frame }),
           ];
-          // Depth sorting: a layer named "Overhead" holds tall
-          // furniture the characters can walk BEHIND. Its tiles get
-          // z = the tile's bottom edge, so the renderer z-sorts them
-          // against the player/NPCs (whose z is their feet position):
-          // north of the furniture = behind it, south = in front.
-          // All other layers stay at z 0 = always under characters.
-          if (layer.name === "Overhead") comps.push(k.z((y + 1) * tile));
+          // Depth sorting: every tile layer EXCEPT the background ones
+          // ("Ground" floor, "Behind Walls" trim) gets z = the tile's
+          // bottom edge. The renderer z-sorts these against characters
+          // (whose z is their feet position): north of furniture =
+          // behind it, south = in front. This lets chairs/desks draw
+          // over a seated NPC (sitting-in look) while a character
+          // standing south of furniture still occludes it.
+          if (layer.name !== "Ground" && layer.name !== "Behind Walls") {
+            comps.push(k.z((y + 1) * tile));
+          }
           switch (flags) {
             case 1: comps.push(k.scale(-1, 1)); break;               // H
             case 2: comps.push(k.scale(1, -1)); break;               // V
