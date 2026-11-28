@@ -461,8 +461,14 @@ function nearestDoor(): { door: Door; d: number } | null {
 // loop. The placeable props are listed in public/content/props.json:
 //   [{ "id": "tv", "sprite": "/assets/limezu/.../animated_old_tv.png", "fps": 6 }]
 // Place one in Tiled with a point object named "prop-<id>" (or give it
-// x/y in the JSON). The game measures the sheet itself, loads it
-// sliced and plays it - nothing to paint, no frame numbers to know.
+// x/y in the JSON). A point anchors the sprite's bottom there; a
+// rectangle anchors the sprite's bottom-CENTER of the rect, so drawing
+// a box over the prop's cells places it exactly. The game measures the
+// sheet itself, loads it sliced and plays it - nothing to paint, no
+// frame numbers to know. Optional "radius" turns the prop from an
+// always-looping animation into a proximity prop (doors): it holds the
+// first frame (closed) and only animates to the halfway frame (open)
+// while the player stands within radius px, then animates back.
 interface PropDef {
   id: string;
   sprite: string;
@@ -471,8 +477,9 @@ interface PropDef {
   fh?: number;    // frame height in px, default 16
   x?: number;     // fallback position if no Tiled "prop-<id>" object
   y?: number;
+  radius?: number; // proximity mode: animate open while player within this many px
 }
-interface PlayingAnim { obj: any; base: number; frames: number; fps: number; }
+interface PlayingAnim { obj: any; base: number; frames: number; fps: number; radius?: number; cur: number; timer: number; }
 let playingAnims: PlayingAnim[] = [];
 let animTimer = 0;
 
@@ -493,8 +500,10 @@ async function spawnProps() {
   } catch { /* no props file: fine */ }
   for (const def of defs) {
     const spot = world.objects.find((o) => o.name === "prop-" + def.id);
-    const x = spot ? spot.x : def.x;
-    const y = spot ? spot.y : def.y;
+    // A point object anchors the sprite bottom at x/y; a rectangle
+    // anchors the bottom-center of the rect (cover the prop's cells).
+    const x = spot ? spot.x + (spot.width || 0) / 2 : def.x;
+    const y = spot ? spot.y + (spot.height || 0) : def.y;
     if (x === undefined || y === undefined) continue; // prop not placed on the map
     try {
       const fw = def.fw ?? 16;
@@ -510,7 +519,9 @@ async function spawnProps() {
       ]);
       // single-row strips play frame by frame; taller sheets play
       // linearly (row after row) - fine for LimeZu animated sheets.
-      playingAnims.push({ obj, base: 0, frames: sx * sy, fps: def.fps ?? 6 });
+      // radius props (doors) start on frame 0 and step toward their
+      // target frame only while the player is near (see onUpdate).
+      playingAnims.push({ obj, base: 0, frames: sx * sy, fps: def.fps ?? 6, radius: def.radius, cur: 0, timer: 0 });
     } catch {
       console.warn("Animated prop failed to load: " + def.id + " (" + def.sprite + ")");
     }
@@ -663,7 +674,22 @@ async function buildWorld() {
     updateNpcs(dt);
     animTimer += dt;
     for (const a of playingAnims) {
-      a.obj.frame = a.base + (Math.floor(animTimer * a.fps) % a.frames);
+      if (a.radius !== undefined) {
+        // Proximity prop (door): hold frame 0, step toward the halfway
+        // frame while the player is within radius, step back when they leave.
+        const near =
+          Math.hypot(playerObj.pos.x - a.obj.pos.x, playerObj.pos.y - a.obj.pos.y) <= a.radius;
+        const target = near ? Math.floor(a.frames / 2) : 0;
+        a.timer += dt;
+        const step = 1 / a.fps;
+        while (a.timer >= step && a.cur !== target) {
+          a.timer -= step;
+          a.cur += target > a.cur ? 1 : -1;
+        }
+        a.obj.frame = a.base + a.cur;
+      } else {
+        a.obj.frame = a.base + (Math.floor(animTimer * a.fps) % a.frames);
+      }
     }
     updateCamera();
     if (toastActive) {

@@ -24,13 +24,15 @@
     "sprite": "/assets/custom/animated_door_glass_double_32.png",
     "fps": 6,
     "fw": 32,
-    "fh": 32
+    "fh": 32,
+    "radius": 48
   },
   {
     "id": "glassdoor-2",
     "sprite": "/assets/custom/animated_door_glass_double_32.png",
     "fps": 6,
     "fw": 32,
-    "fh": 32
+    "fh": 32,
+    "radius": 48
   }
 ]
