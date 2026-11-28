@@ -686,6 +686,9 @@ async function buildWorld() {
           a.timer -= step;
           a.cur += target > a.cur ? 1 : -1;
         }
+        // idle time must not accumulate: otherwise the door skips all
+        // intermediate frames the instant the player enters/leaves radius
+        if (a.cur === target) a.timer = 0;
         a.obj.frame = a.base + a.cur;
       } else {
         a.obj.frame = a.base + (Math.floor(animTimer * a.fps) % a.frames);
