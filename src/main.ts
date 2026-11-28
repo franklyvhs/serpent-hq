@@ -182,6 +182,12 @@ interface NpcDef {
   // and chair backrest layer correctly)
   dx?: number;
   dy?: number;
+  // "hidden": true = render nothing: the character is authored as map
+  // art (e.g. an animated Tiled sprite on its own layer) and this NPC
+  // exists only as an invisible E-talk dialogue trigger at its spot.
+  // All other NPC features (wander, sprites, sit, dx/dy) keep working
+  // for NPCs that don't set this.
+  hidden?: boolean;
   // "sit": true = sit pose 1, 2 = sit pose 2 (never wanders; frame 0 of
   // the sit band is the resting pose). "face" sets initial facing.
   sit?: boolean | number;
@@ -292,6 +298,8 @@ async function spawnNpcs() {
     if (def.face === "up") { npc.fx = 0; npc.fy = -1; }
     else if (def.face === "left") { npc.fx = -1; npc.fy = 0; }
     else if (def.face === "right") { npc.fx = 1; npc.fy = 0; }
+    // hidden NPCs are pure dialogue triggers: map art plays the character
+    if (def.hidden) { npcs.push(npc); continue; }
     // sprite: whole-set sheet if the PNG exists, else placeholder block
     if (def.sprite && (await spriteExists(def.sprite))) {
       try {

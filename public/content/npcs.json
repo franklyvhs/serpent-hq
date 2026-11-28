@@ -2,13 +2,9 @@
   {
     "id": "klumgongyn",
     "name": "Klumgongyn",
-    "sprite": "/assets/characters/serpent_klumgongyn.png",
+    "hidden": true,
     "color": [110, 220, 140],
     "wander": false,
-    "wanderRadius": 40,
-    "speed": 32,
-    "face": "up",
-    "dy": 7,
     "dialogue": [
       "Ah, Agent K. Have you filed your xenodiplomatic paperwork yet? No? Fascinating species.",
       "Varnyr has three moons, Agent. Your coffee has zero. I rest my case.",
