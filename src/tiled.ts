@@ -183,27 +183,29 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         }
         continue; // collision layer is never rendered
       }
-      if (layer.name === "Walls") {
-        // Walls are automatically solid — no need to paint them on the
-        // Collision layer (doorways are gaps, so they stay passable).
-        // EXCEPT: the north row of a 2-row wall band stays walkable so
-        // the player can step behind it — the face row (south) and the
-        // cap row's tiles then draw over the player for a depth effect.
-        // A cap tile qualifies only if it has wall neighbours left or
-        // right (horizontal band) AND a wall tile below (the face
-        // row) AND no wall above (3-row walls stay fully solid, and
-        // vertical wall segments are never walkable).
-        const isWall = (x: number, y: number): boolean => {
+      if (layer.name === "Walls" || layer.name === "Behind Walls") {
+        // Wall layers are automatically solid — no need to paint them on
+        // the Collision layer (doorways are gaps, so they stay passable).
+        // EXCEPT: the north row of a horizontal band stays walkable so
+        // the player can step behind it — the band's tiles then draw
+        // over the player for a depth effect (walls AND the closets on
+        // Behind Walls). A cap tile qualifies only if it has layer
+        // neighbours left or right (horizontal band) AND a tile below
+        // (the face row) AND no tile above (3-row stacks stay fully
+        // solid, and vertical segments are never walkable). Paint the
+        // Collision layer on a cap cell to re-block it: Collision is
+        // processed first and this rule never unsets it.
+        const isHere = (x: number, y: number): boolean => {
           if (x < 0 || x >= mapW || y < 0 || y >= mapH) return false;
           return (layer.data[y * mapW + x] & 0x1fffffff) > 0;
         };
         for (let y = 0; y < mapH; y++) {
           for (let x = 0; x < mapW; x++) {
-            if (!isWall(x, y)) continue;
-            const inHorizontalBand = isWall(x - 1, y) || isWall(x + 1, y);
-            const hasFaceRowBelow = isWall(x, y + 1);
-            const hasWallAbove = isWall(x, y - 1);
-            const walkableCap = inHorizontalBand && hasFaceRowBelow && !hasWallAbove;
+            if (!isHere(x, y)) continue;
+            const inHorizontalBand = isHere(x - 1, y) || isHere(x + 1, y);
+            const hasFaceRowBelow = isHere(x, y + 1);
+            const hasTileAbove = isHere(x, y - 1);
+            const walkableCap = inHorizontalBand && hasFaceRowBelow && !hasTileAbove;
             if (!walkableCap) solid[y * mapW + x] = 1;
           }
         }
