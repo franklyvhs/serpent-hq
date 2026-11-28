@@ -237,11 +237,16 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
         }
         if (layer.name === "Behind Walls") {
           // bottom-up: a cell is boosted if the run below it lands on a
-          // Walls cell; the whole run then shares one z (the wall's)
+          // Walls cell; the whole run then shares one z (the wall's).
+          // Tiles painted ON wall rows (trim over the wall band) are NOT
+          // boosted: they keep normal depth and stay behind the wall
+          // art via add-order z ties — only tiles strictly ABOVE the
+          // wall (closet fronts) get the wall's depth.
           for (let y = mapH - 1; y >= 0; y--) {
             for (let x = 0; x < mapW; x++) {
               const cell = y * mapW + x;
               if (!isHere(x, y)) continue;
+              if (wallCells.has(cell)) continue;
               const belowCell = (y + 1) * mapW + x;
               const belowIsWall = y + 1 < mapH && wallCells.has(belowCell);
               const belowIsBoosted =
