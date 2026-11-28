@@ -79,6 +79,8 @@ const range = (n: number) => Array.from({ length: n }, (_i) => _i);
 const ANIM_FRAME: Record<string, number> = { right: 0, up: 6, left: 12, down: 18 };
 const IDLE_ROW = 1 * 56; // slice index where the idle band starts
 const WALK_ROW = 2 * 56; // slice index where the walk band starts
+const SIT1_ROW = 4 * 56; // band 4 of the whole-set sheet: sitting, pose 1
+const SIT2_ROW = 5 * 56; // band 5: sitting, pose 2
 const WALK_FPS = 10; // walk animation, frames per second
 const IDLE_FPS = 4;  // idle sway, frames per second
 
@@ -170,6 +172,10 @@ interface NpcDef {
   wander?: boolean;
   wanderRadius?: number;
   speed?: number;
+  // "sit": true = sit pose 1, 2 = sit pose 2 (never wanders; frame 0 of
+  // the sit band is the resting pose). "face" sets initial facing.
+  sit?: boolean | number;
+  face?: "down" | "up" | "left" | "right";
   dialogue: string[];
 }
 interface Npc extends NpcDef {
@@ -266,6 +272,10 @@ async function spawnNpcs() {
       hasSheet: false,
       animTimer: 0,
     };
+    // initial facing from the JSON (default down)
+    if (def.face === "up") { npc.fx = 0; npc.fy = -1; }
+    else if (def.face === "left") { npc.fx = -1; npc.fy = 0; }
+    else if (def.face === "right") { npc.fx = 1; npc.fy = 0; }
     // sprite: whole-set sheet if the PNG exists, else placeholder block
     if (def.sprite && (await spriteExists(def.sprite))) {
       try {
@@ -314,9 +324,10 @@ function npcSolidAt(px: number, py: number): boolean {
 function updateNpcs(dt: number) {
   for (const npc of npcs) {
     if (npc.state === "idle") {
+      npc.animTimer += dt; // drives idle/sit sway frames
       npc.timer -= dt;
       if (npc.timer <= 0) {
-        if (npc.wander) {
+        if (npc.wander && !npc.sit) {
           // pick a reachable target within the wander radius of home
           const r = npc.wanderRadius ?? 40;
           for (let tries = 0; tries < 6; tries++) {
@@ -368,7 +379,8 @@ function updateNpcs(dt: number) {
       } else {
         npc.walkObj.hidden = true;
         npc.idleObj.hidden = false;
-        npc.idleObj.frame = IDLE_ROW + ANIM_FRAME[dirName] + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
+        const poseRow = npc.sit === 2 ? SIT2_ROW : npc.sit ? SIT1_ROW : IDLE_ROW;
+        npc.idleObj.frame = poseRow + ANIM_FRAME[dirName] + (Math.floor(npc.animTimer * IDLE_FPS) % 6);
       }
     }
   }

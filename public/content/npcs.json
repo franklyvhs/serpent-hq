@@ -20,6 +20,8 @@
     "sprite": "/assets/characters/npc_overseer.png",
     "color": [170, 130, 200],
     "wander": false,
+    "sit": true,
+    "face": "up",
     "dialogue": [
       "Contracts do not solve themselves, Agent K. Walk away from my corner and go solve one.",
       "SERPENT has operated since 1968. Do not be the reason it stops.",
