@@ -177,6 +177,11 @@ interface NpcDef {
   wander?: boolean;
   wanderRadius?: number;
   speed?: number;
+  // pixel nudges on top of the Tiled spot: handy for depth sorting
+  // (e.g. a desk sitter a few px south of the seat so the desk edge
+  // and chair backrest layer correctly)
+  dx?: number;
+  dy?: number;
   // "sit": true = sit pose 1, 2 = sit pose 2 (never wanders; frame 0 of
   // the sit band is the resting pose). "face" sets initial facing.
   sit?: boolean | number;
@@ -268,14 +273,17 @@ async function spawnNpcs() {
       console.warn("NPC skipped (no position): add a Tiled object named npc-" + def.id);
       continue;
     }
+    // optional pixel nudge from the JSON (dx/dy)
+    const spawnX = startX + (def.dx ?? 0);
+    const spawnY = startY + (def.dy ?? 0);
     const npc: Npc = {
       ...def,
-      hx: startX, hy: startY,
-      px: startX, py: startY,
+      hx: spawnX, hy: spawnY,
+      px: spawnX, py: spawnY,
       fx: 0, fy: 1, // default facing down
       state: "idle",
       timer: 1 + Math.random() * 3,
-      tx: startX, ty: startY,
+      tx: spawnX, ty: spawnY,
       walkObj: null, idleObj: null, tagObj: null,
       hasSheet: false,
       animTimer: 0,
