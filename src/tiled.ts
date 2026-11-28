@@ -186,15 +186,19 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
       if (layer.name === "Walls" || layer.name === "Behind Walls") {
         // Wall layers are automatically solid — no need to paint them on
         // the Collision layer (doorways are gaps, so they stay passable).
-        // EXCEPT: the north row of a horizontal band stays walkable so
-        // the player can step behind it — the band's tiles then draw
-        // over the player for a depth effect (walls AND the closets on
-        // Behind Walls). A cap tile qualifies only if it has layer
-        // neighbours left or right (horizontal band) AND a tile below
-        // (the face row) AND no tile above (3-row stacks stay fully
-        // solid, and vertical segments are never walkable). Paint the
-        // Collision layer on a cap cell to re-block it: Collision is
-        // processed first and this rule never unsets it.
+        // EXCEPT the outer rows of a horizontal band stay walkable so
+        // the player can step behind/into them for a depth effect:
+        //  - WALLS act as barriers: only their north row is a walkable
+        //    cap (no tile above, tiles below). The face row stays solid
+        //    so walls can never be walked through.
+        //  - BEHIND WALLS content (closets, furniture backs) also gets
+        //    a SOUTH cap (tile row with tiles above, regardless of
+        //    what's below: the wall or floor below already blocks
+        //    through-passage), so the player can step into its front
+        //    row from the wall cap behind it.
+        // Interior rows of a band are always solid. Paint the Collision
+        // layer on any cap cell to re-block it: Collision is processed
+        // first and this rule never unsets it.
         const isHere = (x: number, y: number): boolean => {
           if (x < 0 || x >= mapW || y < 0 || y >= mapH) return false;
           return (layer.data[y * mapW + x] & 0x1fffffff) > 0;
@@ -205,8 +209,10 @@ export async function loadTiled(k: any, mapUrl: string): Promise<TiledWorld> {
             const inHorizontalBand = isHere(x - 1, y) || isHere(x + 1, y);
             const hasFaceRowBelow = isHere(x, y + 1);
             const hasTileAbove = isHere(x, y - 1);
-            const walkableCap = inHorizontalBand && hasFaceRowBelow && !hasTileAbove;
-            if (!walkableCap) solid[y * mapW + x] = 1;
+            const northCap = inHorizontalBand && hasFaceRowBelow && !hasTileAbove;
+            const southCap =
+              layer.name === "Behind Walls" && inHorizontalBand && hasTileAbove;
+            if (!northCap && !southCap) solid[y * mapW + x] = 1;
           }
         }
       }
